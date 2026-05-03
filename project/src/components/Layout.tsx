@@ -75,9 +75,9 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 font-bold text-lg">
+          <Link to="/" className="flex items-center gap-2 font-bold text-lg" title="Wiki by Abdullah">
             <BookOpen className="h-5 w-5 text-primary" />
-            <span>Wiki by Abdullah</span>
+            <span>W/A</span>
           </Link>
 
           <div className="hidden sm:flex items-center gap-1">
