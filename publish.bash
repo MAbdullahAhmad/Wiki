@@ -8,16 +8,18 @@ set -euo pipefail
 # Usage:
 #   ./publish.bash              Interactive mode (select files)
 #   ./publish.bash --all        Publish all drafts
-#   ./publish.bash <file> ...   Publish specific files (by relative
-#                               path under drafts/ or just filename)
+#   ./publish.bash <file> ...   Publish specific files
 #
 # Workflow:
 #   1. Selects drafts to publish
-#   2. For each draft, auto-detects mentions of existing wiki pages
-#   3. Lets you choose which mentions to convert to markdown links
-#   4. Derives tags from directory structure (domain/subject/topic)
-#   5. Copies processed file to wiki/<slug>.md
-#   6. Regenerates wiki/_index.json with updated metadata
+#   2. For each draft:
+#      a) Generates two JSON files (.publish/):
+#         - local-links.json   (links to other wiki pages)
+#         - wikipedia-links.json (links to Wikipedia articles)
+#      b) Opens the files for you to set "include": true
+#      c) Waits for you to press Enter
+#      d) Applies selected links and publishes to wiki/
+#   3. Regenerates wiki/_index.json with updated metadata
 # ============================================================
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,6 +27,7 @@ DRAFTS_DIR="$REPO_ROOT/drafts"
 WIKI_DIR="$REPO_ROOT/wiki"
 PROJECT_DIR="$REPO_ROOT/project"
 HELPER="$PROJECT_DIR/scripts/publish-helper.js"
+PUBLISH_DIR="$REPO_ROOT/.publish"
 
 # ── Colors ──
 RED='\033[0;31m'
@@ -32,6 +35,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
@@ -145,82 +149,80 @@ for idx in "${SELECTED_INDICES[@]}"; do
     slug=$(basename "$file" .md)
 
     echo ""
-    echo -e "${CYAN}━━━ ${BOLD}${rel_path}${NC}${CYAN} ━━━${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${CYAN}  ${BOLD}${rel_path}${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-    # Step 1: Detect links to other wiki pages
-    echo -e "  ${DIM}Scanning for linkable references...${NC}"
+    # Step 1: Generate link files (local + Wikipedia)
+    echo ""
+    echo -e "  ${DIM}Scanning for linkable references & searching Wikipedia...${NC}"
 
-    DETECTED_LINES=()
-    while IFS= read -r line; do
-        [ -n "$line" ] && DETECTED_LINES+=("$line")
-    done < <(node "$HELPER" detect-links "$file" 2>/dev/null || true)
+    GEN_OUTPUT=$(node "$HELPER" generate-link-files "$file" 2>&1 || true)
 
-    APPLY_LINKS=""
+    LOCAL_COUNT=$(echo "$GEN_OUTPUT" | grep "^LOCAL:" | sed 's/LOCAL://')
+    WIKI_COUNT=$(echo "$GEN_OUTPUT" | grep "^WIKIPEDIA:" | sed 's/WIKIPEDIA://')
+    FILES_LINE=$(echo "$GEN_OUTPUT" | grep "^FILES:" | sed 's/FILES://')
+    LOCAL_FILE=$(echo "$FILES_LINE" | cut -d'|' -f1)
+    WIKI_FILE=$(echo "$FILES_LINE" | cut -d'|' -f2)
 
-    if [ ${#DETECTED_LINES[@]} -gt 0 ]; then
+    LOCAL_COUNT=${LOCAL_COUNT:-0}
+    WIKI_COUNT=${WIKI_COUNT:-0}
+
+    echo ""
+    echo -e "  ${GREEN}Found:${NC}"
+    echo -e "    ${BLUE}Local wiki links:${NC}     ${BOLD}${LOCAL_COUNT}${NC} potential match(es)"
+    echo -e "    ${MAGENTA}Wikipedia links:${NC}    ${BOLD}${WIKI_COUNT}${NC} potential match(es)"
+
+    if (( LOCAL_COUNT > 0 || WIKI_COUNT > 0 )); then
         echo ""
-        echo -e "  ${GREEN}Found ${#DETECTED_LINES[@]} potential link(s):${NC}"
+        echo -e "  ${BOLD}Review the link files and set ${GREEN}\"include\": true${NC}${BOLD} for links you want:${NC}"
 
-        for i in "${!DETECTED_LINES[@]}"; do
-            IFS='|' read -r d_slug d_title d_count <<<"${DETECTED_LINES[$i]}"
-            printf "    ${YELLOW}%d${NC}. \"%s\" ${DIM}(%s occurrence(s))${NC} ${DIM}→ %s${NC}\n" \
-                $((i + 1)) "$d_title" "$d_count" "$d_slug"
-        done
-
-        echo ""
-        echo -e "  Select links to apply ${DIM}(comma-separated)${NC}, ${GREEN}'a'${NC} for all, or ${YELLOW}Enter${NC} to skip:"
-        read -rp "  > " link_selection
-
-        if [[ "$link_selection" == "a" || "$link_selection" == "A" ]]; then
-            LINK_SLUGS=()
-            for line in "${DETECTED_LINES[@]}"; do
-                IFS='|' read -r d_slug _ _ <<<"$line"
-                LINK_SLUGS+=("$d_slug")
-            done
-            APPLY_LINKS=$(
-                IFS=','
-                echo "${LINK_SLUGS[*]}"
-            )
-        elif [[ -n "$link_selection" ]]; then
-            IFS=',' read -ra LINK_PARTS <<<"$link_selection"
-            LINK_SLUGS=()
-            for part in "${LINK_PARTS[@]}"; do
-                part=$(echo "$part" | tr -d ' ')
-                if [[ "$part" =~ ^[0-9]+$ ]]; then
-                    lidx=$((part - 1))
-                    if ((lidx >= 0 && lidx < ${#DETECTED_LINES[@]})); then
-                        IFS='|' read -r d_slug _ _ <<<"${DETECTED_LINES[$lidx]}"
-                        LINK_SLUGS+=("$d_slug")
-                    fi
-                fi
-            done
-            if [ ${#LINK_SLUGS[@]} -gt 0 ]; then
-                APPLY_LINKS=$(
-                    IFS=','
-                    echo "${LINK_SLUGS[*]}"
-                )
-            fi
+        if (( LOCAL_COUNT > 0 )); then
+            echo -e "    ${BLUE}Local:${NC}     ${DIM}${LOCAL_FILE}${NC}"
         fi
+        if (( WIKI_COUNT > 0 )); then
+            echo -e "    ${MAGENTA}Wikipedia:${NC} ${DIM}${WIKI_FILE}${NC}"
+        fi
+
+        echo ""
+        echo -e "  ${YELLOW}Edit the JSON file(s) in your editor, save, then press Enter here to continue.${NC}"
+        echo -e "  ${DIM}(Press Enter without editing to skip all links)${NC}"
+        read -rp "  > Press Enter to continue... "
     else
-        echo -e "  ${DIM}No auto-linkable references found.${NC}"
+        echo -e "  ${DIM}No linkable references found — publishing as-is.${NC}"
     fi
 
-    # Step 2: Publish the file via helper
-    RESULT=$(node "$HELPER" publish "$file" "$APPLY_LINKS" 2>&1)
+    # Step 2: Publish (reads the JSON files automatically)
+    RESULT=$(node "$HELPER" publish "$file" 2>&1)
 
     if echo "$RESULT" | grep -q "^PUBLISHED"; then
         pub_slug=$(echo "$RESULT" | sed 's/PUBLISHED //')
-        if [ -n "$APPLY_LINKS" ]; then
-            link_count=$(echo "$APPLY_LINKS" | tr ',' '\n' | wc -l | tr -d ' ')
-            echo -e "  ${GREEN}Published${NC} wiki/${pub_slug}.md  ${DIM}(${link_count} link(s) applied)${NC}"
-        else
-            echo -e "  ${GREEN}Published${NC} wiki/${pub_slug}.md"
+
+        # Count how many links were actually applied
+        APPLIED_LOCAL=0
+        APPLIED_WIKI=0
+        if [ -f "$LOCAL_FILE" ] 2>/dev/null; then
+            APPLIED_LOCAL=$(grep -c '"include": true' "$LOCAL_FILE" 2>/dev/null || echo 0)
+        fi
+        if [ -f "$WIKI_FILE" ] 2>/dev/null; then
+            APPLIED_WIKI=$(grep -c '"include": true' "$WIKI_FILE" 2>/dev/null || echo 0)
+        fi
+
+        echo ""
+        echo -e "  ${GREEN}Published${NC} → wiki/${pub_slug}.md"
+        if (( APPLIED_LOCAL > 0 || APPLIED_WIKI > 0 )); then
+            echo -e "  ${DIM}Links applied: ${APPLIED_LOCAL} local, ${APPLIED_WIKI} Wikipedia${NC}"
         fi
         PUBLISHED=$((PUBLISHED + 1))
     else
         echo -e "  ${RED}Failed:${NC} $RESULT"
     fi
 done
+
+# ── Clean up .publish/ directory ──
+if [ -d "$PUBLISH_DIR" ]; then
+    rm -rf "$PUBLISH_DIR"
+fi
 
 # ── Regenerate wiki index ──
 echo ""

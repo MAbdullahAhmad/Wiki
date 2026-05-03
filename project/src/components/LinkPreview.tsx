@@ -82,7 +82,7 @@ export function LinkPreview({ slug, children }: LinkPreviewProps) {
         onMouseEnter={handleMouseEnter}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className="text-primary underline underline-offset-2 decoration-primary/40 hover:decoration-primary transition-colors cursor-pointer"
+        className="link-local cursor-pointer"
       >
         {children}
       </a>

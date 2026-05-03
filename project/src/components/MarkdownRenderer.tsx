@@ -2,6 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import rehypeSlug from 'rehype-slug';
+import { ExternalLink } from 'lucide-react';
 import { LinkPreview } from './LinkPreview';
 import { useWikiIndex } from '@/hooks/useWikiIndex';
 import type { Components } from 'react-markdown';
@@ -11,26 +12,58 @@ interface MarkdownRendererProps {
   content: string;
 }
 
+function isWikipediaUrl(href: string): boolean {
+  return /^https?:\/\/([a-z]+\.)?wikipedia\.org\//i.test(href);
+}
+
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const { index } = useWikiIndex();
   const slugs = new Set(index?.pages.map((p) => p.slug) || []);
 
   const components: Components = {
     a: ({ href, children, ...props }) => {
+      // Local wiki link (relative slug)
       if (href && !href.startsWith('http') && !href.startsWith('#')) {
         const slug = href.replace(/\.md$/, '').replace(/^\//, '');
         if (slugs.has(slug)) {
           return <LinkPreview slug={slug}>{children as ReactNode}</LinkPreview>;
         }
       }
-      if (href?.startsWith('http')) {
+
+      // Wikipedia link
+      if (href && isWikipediaUrl(href)) {
         return (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2" {...props}>
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link-wikipedia"
+            {...props}
+          >
             {children}
+            <span className="wiki-indicator">W</span>
           </a>
         );
       }
-      return <a href={href} className="text-primary underline underline-offset-2" {...props}>{children}</a>;
+
+      // External link (non-Wikipedia)
+      if (href?.startsWith('http')) {
+        return (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link-external"
+            {...props}
+          >
+            {children}
+            <ExternalLink className="external-indicator" />
+          </a>
+        );
+      }
+
+      // Fallback (anchor links, etc.)
+      return <a href={href} className="link-local" {...props}>{children}</a>;
     },
     h1: ({ children, ...props }) => (
       <h1 className="text-3xl font-bold tracking-tight mt-8 mb-4 pb-2 border-b border-border" {...props}>{children}</h1>

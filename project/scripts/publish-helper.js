@@ -4,22 +4,29 @@
  * publish-helper.js - Node.js helper for the publish.bash script
  *
  * Commands:
- *   detect-links <draft-file>
- *     Scans a draft for mentions of existing wiki page titles.
- *     Output: slug|title|count (one per line, pipe-delimited)
+ *   generate-link-files <draft-file>
+ *     Detects local wiki links and Wikipedia links.
+ *     Writes .publish/local-links.json and .publish/wikipedia-links.json
+ *     with include:false by default for user review.
  *
- *   publish <draft-file> [links-to-apply]
- *     Publishes a draft to wiki/. Updates frontmatter tags from directory
- *     structure, applies selected auto-links, copies to wiki/<slug>.md.
+ *   publish <draft-file>
+ *     Reads .publish/*.json, applies links where include:true,
+ *     updates frontmatter, copies to wiki/<slug>.md.
  *     Output: "PUBLISHED <slug>" on success
  */
 
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'fs';
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+} from 'fs';
 import { basename, relative, resolve, join } from 'path';
 
 const REPO_ROOT = resolve(import.meta.dirname, '../..');
 const DRAFTS_DIR = resolve(REPO_ROOT, 'drafts');
 const WIKI_DIR = resolve(REPO_ROOT, 'wiki');
+const PUBLISH_DIR = resolve(REPO_ROOT, '.publish');
 
 // ═══════════════════════════════════════════════════════════
 // Frontmatter parsing & serialization
@@ -42,7 +49,6 @@ function parseFrontmatter(raw) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    // Top-level key (not indented, not a list item)
     if (!line.startsWith(' ') && !line.startsWith('\t') && !line.startsWith('-')) {
       if (inTagItem && Object.keys(tagObj).length > 0) {
         if (!currentList) currentList = [];
@@ -58,15 +64,11 @@ function parseFrontmatter(raw) {
       if (colonIdx > 0) {
         currentKey = trimmed.slice(0, colonIdx).trim();
         const val = trimmed.slice(colonIdx + 1).trim();
-        if (val) {
-          meta[currentKey] = val.replace(/^["']|["']$/g, '');
-        }
+        if (val) meta[currentKey] = val.replace(/^["']|["']$/g, '');
       }
     } else if (trimmed.startsWith('- type:')) {
       if (!currentList) currentList = [];
-      if (inTagItem && Object.keys(tagObj).length > 0) {
-        currentList.push({ ...tagObj });
-      }
+      if (inTagItem && Object.keys(tagObj).length > 0) currentList.push({ ...tagObj });
       tagObj = { type: trimmed.slice(7).trim().replace(/^["']|["']$/g, '') };
       inTagItem = true;
     } else if (trimmed.match(/^name:/) && inTagItem) {
@@ -81,16 +83,13 @@ function parseFrontmatter(raw) {
     if (!currentList) currentList = [];
     currentList.push({ ...tagObj });
   }
-  if (currentList && currentKey) {
-    meta[currentKey] = currentList;
-  }
+  if (currentList && currentKey) meta[currentKey] = currentList;
 
   return { meta, content };
 }
 
 function serializeFrontmatter(meta, content) {
   const lines = ['---'];
-
   if (meta.title) lines.push(`title: "${meta.title}"`);
   if (meta.description) lines.push(`description: "${meta.description}"`);
 
@@ -101,25 +100,18 @@ function serializeFrontmatter(meta, content) {
       lines.push(`    name: ${tag.name}`);
     }
   }
-
   if (meta.related && meta.related.length > 0) {
     lines.push('related:');
-    for (const rel of meta.related) {
-      lines.push(`  - ${rel}`);
-    }
+    for (const rel of meta.related) lines.push(`  - ${rel}`);
   }
-
-  // Preserve any extra keys
   for (const [key, val] of Object.entries(meta)) {
     if (['title', 'description', 'tags', 'related'].includes(key)) continue;
-    if (typeof val === 'string') {
-      lines.push(`${key}: "${val}"`);
-    } else if (Array.isArray(val) && val.every((v) => typeof v === 'string')) {
+    if (typeof val === 'string') lines.push(`${key}: "${val}"`);
+    else if (Array.isArray(val) && val.every((v) => typeof v === 'string')) {
       lines.push(`${key}:`);
       for (const item of val) lines.push(`  - ${item}`);
     }
   }
-
   lines.push('---');
   lines.push('');
   return lines.join('\n') + content;
@@ -130,86 +122,73 @@ function serializeFrontmatter(meta, content) {
 // ═══════════════════════════════════════════════════════════
 
 function slugToTitle(slug) {
-  return slug
-    .split('-')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
+  return slug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-/**
- * Derives the tag for a file based on its position in drafts/.
- *
- * Directory layout:
- *   drafts/<Domain>/<Subject>/<file>.md          → topic
- *   drafts/<Domain>/<Subject>/<Topic>/<file>.md  → subtopic
- *   drafts/<Domain>/<file>.md                    → subject-level (rare)
- *   drafts/<file>.md                             → no auto-tag
- */
 function deriveTagFromPath(filePath, title) {
   if (!filePath.startsWith(DRAFTS_DIR)) return null;
   const rel = relative(DRAFTS_DIR, filePath);
-  const parts = rel.split('/');
-  const dirs = parts.slice(0, -1); // directory components only
+  const dirs = rel.split('/').slice(0, -1);
   const name = title || slugToTitle(basename(filePath, '.md'));
 
   switch (dirs.length) {
-    case 0:
-      return null;
-    case 1:
-      return { type: 'domain', name: dirs[0] };
-    case 2:
-      return { type: 'topic', name };
-    default:
-      return { type: 'subtopic', name };
+    case 0: return null;
+    case 1: return { type: 'domain', name: dirs[0] };
+    case 2: return { type: 'topic', name };
+    default: return { type: 'subtopic', name };
   }
 }
 
 // ═══════════════════════════════════════════════════════════
-// Link detection
+// Local link detection
 // ═══════════════════════════════════════════════════════════
 
 function loadWikiPages() {
   const indexPath = join(WIKI_DIR, '_index.json');
   if (!existsSync(indexPath)) return [];
   try {
-    const data = JSON.parse(readFileSync(indexPath, 'utf-8'));
-    return data.pages || [];
+    return JSON.parse(readFileSync(indexPath, 'utf-8')).pages || [];
   } catch {
     return [];
   }
 }
 
-/**
- * Scans content for mentions of known wiki page titles that aren't already linked.
- * Returns array of { slug, title, count }.
- */
-function detectLinks(content, wikiPages, currentSlug) {
-  // Strip code blocks and existing links for detection
-  let cleaned = content;
-  // Remove fenced code blocks
-  cleaned = cleaned.replace(/```[\s\S]*?```/g, (m) => ' '.repeat(m.length));
-  // Remove inline code
-  cleaned = cleaned.replace(/`[^`]+`/g, (m) => ' '.repeat(m.length));
-  // Mark existing markdown links so we skip them
-  cleaned = cleaned.replace(/\[([^\]]*)\]\([^)]*\)/g, (m) => ' '.repeat(m.length));
+function cleanForDetection(content) {
+  let c = content;
+  c = c.replace(/```[\s\S]*?```/g, (m) => ' '.repeat(m.length));
+  c = c.replace(/`[^`]+`/g, (m) => ' '.repeat(m.length));
+  c = c.replace(/\[([^\]]*)\]\([^)]*\)/g, (m) => ' '.repeat(m.length));
+  return c;
+}
 
+function extractContext(content, index, matchLen) {
+  const start = Math.max(0, index - 40);
+  const end = Math.min(content.length, index + matchLen + 40);
+  let ctx = content.slice(start, end).replace(/\n/g, ' ').trim();
+  if (start > 0) ctx = '...' + ctx;
+  if (end < content.length) ctx = ctx + '...';
+  return ctx;
+}
+
+function detectLocalLinks(content, wikiPages, currentSlug) {
+  const cleaned = cleanForDetection(content);
   const results = [];
 
   for (const page of wikiPages) {
     if (page.slug === currentSlug) continue;
-
     const escaped = page.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Match whole phrase, not inside a word
     const regex = new RegExp(`(?<![\\w])${escaped}(?![\\w])`, 'gi');
 
     let count = 0;
+    let firstContext = '';
     let m;
     while ((m = regex.exec(cleaned)) !== null) {
+      if (count === 0) firstContext = extractContext(content, m.index, m[0].length);
       count++;
     }
 
     if (count > 0) {
-      results.push({ slug: page.slug, title: page.title, count });
+      results.push({ slug: page.slug, title: page.title, count, context: firstContext });
     }
   }
 
@@ -217,33 +196,114 @@ function detectLinks(content, wikiPages, currentSlug) {
   return results;
 }
 
-/**
- * Applies auto-links: replaces the FIRST plain-text occurrence of each
- * selected title with a markdown link [Title](slug). Skips code blocks
- * and heading lines.
- */
-function applyLinks(content, linksToApply, wikiPages) {
+// ═══════════════════════════════════════════════════════════
+// Wikipedia link detection
+// ═══════════════════════════════════════════════════════════
+
+function extractWikipediaTerms(content, localTitles, pageTitle) {
+  const terms = new Map(); // term -> context
+  const localLower = new Set(localTitles.map((t) => t.toLowerCase()));
+  const cleaned = content
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`[^`]+`/g, '');
+
+  // Bold phrases
+  const boldRegex = /\*\*([^*]+)\*\*/g;
+  let m;
+  while ((m = boldRegex.exec(cleaned)) !== null) {
+    const term = m[1].trim();
+    if (term.length < 3 || term.length > 80) continue;
+    if (term.toLowerCase() === pageTitle.toLowerCase()) continue;
+    if (localLower.has(term.toLowerCase())) continue;
+    if (!terms.has(term.toLowerCase())) {
+      const ctx = extractContext(cleaned, m.index, m[0].length);
+      terms.set(term.toLowerCase(), { term, context: ctx });
+    }
+  }
+
+  // Section headings (H2, H3, H4)
+  for (const line of cleaned.split('\n')) {
+    const hMatch = line.match(/^#{2,4}\s+(.+)/);
+    if (hMatch) {
+      const heading = hMatch[1].trim();
+      if (heading.length < 3 || heading.length > 80) continue;
+      if (heading.toLowerCase() === pageTitle.toLowerCase()) continue;
+      if (localLower.has(heading.toLowerCase())) continue;
+      if (!terms.has(heading.toLowerCase())) {
+        terms.set(heading.toLowerCase(), {
+          term: heading,
+          context: `Section heading: "${heading}"`,
+        });
+      }
+    }
+  }
+
+  return [...terms.values()].slice(0, 20);
+}
+
+async function searchWikipedia(term) {
+  try {
+    const url =
+      `https://en.wikipedia.org/w/api.php?action=query&list=search` +
+      `&srsearch=${encodeURIComponent(term)}&srlimit=1&utf8=1&format=json`;
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const results = data?.query?.search;
+    if (!results || results.length === 0) return null;
+
+    const r = results[0];
+    const title = r.title;
+    const snippet = r.snippet.replace(/<[^>]+>/g, '').slice(0, 200);
+    const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`;
+    return { title, snippet, url: wikiUrl };
+  } catch {
+    return null;
+  }
+}
+
+async function detectWikipediaLinks(content, localTitles, pageTitle) {
+  const candidates = extractWikipediaTerms(content, localTitles, pageTitle);
+  if (candidates.length === 0) return [];
+
+  const results = [];
+  for (const { term, context } of candidates) {
+    const result = await searchWikipedia(term);
+    if (result) {
+      results.push({
+        term,
+        wikipedia_title: result.title,
+        url: result.url,
+        description: result.snippet,
+        context,
+      });
+    }
+    // Small delay to be polite to Wikipedia API
+    await new Promise((r) => setTimeout(r, 80));
+  }
+
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Apply links to content
+// ═══════════════════════════════════════════════════════════
+
+function applyLocalLinks(content, links, wikiPages) {
   let result = content;
 
-  for (const slug of linksToApply) {
+  for (const slug of links) {
     const page = wikiPages.find((p) => p.slug === slug);
     if (!page) continue;
 
     const lines = result.split('\n');
     const out = [];
     let inCodeBlock = false;
-    let linked = false; // only link first occurrence overall
+    let linked = false;
 
     for (const line of lines) {
-      if (line.trim().startsWith('```')) {
-        inCodeBlock = !inCodeBlock;
-        out.push(line);
-        continue;
-      }
-      if (inCodeBlock || line.startsWith('#') || linked) {
-        out.push(line);
-        continue;
-      }
+      if (line.trim().startsWith('```')) { inCodeBlock = !inCodeBlock; out.push(line); continue; }
+      if (inCodeBlock || line.startsWith('#') || linked) { out.push(line); continue; }
 
       const escaped = page.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(`(?<![\\[\\w/])${escaped}(?![\\]\\w)(/])`, 'gi');
@@ -255,10 +315,36 @@ function applyLinks(content, linksToApply, wikiPages) {
       });
       out.push(newLine);
     }
-
     result = out.join('\n');
   }
+  return result;
+}
 
+function applyWikipediaLinks(content, links) {
+  let result = content;
+
+  for (const { term, url } of links) {
+    const lines = result.split('\n');
+    const out = [];
+    let inCodeBlock = false;
+    let linked = false;
+
+    for (const line of lines) {
+      if (line.trim().startsWith('```')) { inCodeBlock = !inCodeBlock; out.push(line); continue; }
+      if (inCodeBlock || line.startsWith('#') || linked) { out.push(line); continue; }
+
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(?<![\\[\\w/])${escaped}(?![\\]\\w)(/])`, 'gi');
+
+      const newLine = line.replace(regex, (match) => {
+        if (linked) return match;
+        linked = true;
+        return `[${match}](${url})`;
+      });
+      out.push(newLine);
+    }
+    result = out.join('\n');
+  }
   return result;
 }
 
@@ -268,22 +354,72 @@ function applyLinks(content, linksToApply, wikiPages) {
 
 const command = process.argv[2];
 
-if (command === 'detect-links') {
+if (command === 'generate-link-files') {
   const draftFile = resolve(process.argv[3]);
   const raw = readFileSync(draftFile, 'utf-8');
-  const { content } = parseFrontmatter(raw);
+  const { meta, content } = parseFrontmatter(raw);
   const slug = basename(draftFile, '.md');
+  const pageTitle = meta.title || slugToTitle(slug);
   const pages = loadWikiPages();
+  const localTitles = pages.map((p) => p.title);
 
-  const detected = detectLinks(content, pages, slug);
-  for (const d of detected) {
-    process.stdout.write(`${d.slug}|${d.title}|${d.count}\n`);
-  }
+  mkdirSync(PUBLISH_DIR, { recursive: true });
+
+  // Detect local links
+  const localDetected = detectLocalLinks(content, pages, slug);
+  const localFile = join(PUBLISH_DIR, 'local-links.json');
+  writeFileSync(
+    localFile,
+    JSON.stringify(
+      {
+        _info: 'Set "include" to true for local wiki links you want to add. Save the file, then press Enter in terminal.',
+        _file: basename(draftFile),
+        links: localDetected.map((d) => ({
+          include: false,
+          title: d.title,
+          slug: d.slug,
+          occurrences: d.count,
+          context: d.context,
+        })),
+      },
+      null,
+      2
+    ),
+    'utf-8'
+  );
+
+  // Detect Wikipedia links
+  process.stderr.write('Searching Wikipedia...\n');
+  const wikiDetected = await detectWikipediaLinks(content, localTitles, pageTitle);
+  const wikiFile = join(PUBLISH_DIR, 'wikipedia-links.json');
+  writeFileSync(
+    wikiFile,
+    JSON.stringify(
+      {
+        _info: 'Set "include" to true for Wikipedia links you want to add. Save the file, then press Enter in terminal.',
+        _file: basename(draftFile),
+        links: wikiDetected.map((d) => ({
+          include: false,
+          term: d.term,
+          wikipedia_title: d.wikipedia_title,
+          url: d.url,
+          description: d.description,
+          context: d.context,
+        })),
+      },
+      null,
+      2
+    ),
+    'utf-8'
+  );
+
+  // Output summary
+  process.stdout.write(`LOCAL:${localDetected.length}\n`);
+  process.stdout.write(`WIKIPEDIA:${wikiDetected.length}\n`);
+  process.stdout.write(`FILES:${localFile}|${wikiFile}\n`);
+
 } else if (command === 'publish') {
   const draftFile = resolve(process.argv[3]);
-  const linksArg = process.argv[4] || '';
-  const linksToApply = linksArg ? linksArg.split(',').filter(Boolean) : [];
-
   const raw = readFileSync(draftFile, 'utf-8');
   const { meta, content } = parseFrontmatter(raw);
   const slug = basename(draftFile, '.md');
@@ -297,21 +433,54 @@ if (command === 'detect-links') {
   // Derive tag from directory structure
   const derivedTag = deriveTagFromPath(draftFile, meta.title);
   if (derivedTag) {
-    // Replace any existing tag of the same type
     meta.tags = meta.tags.filter((t) => t.type !== derivedTag.type);
     meta.tags = [derivedTag, ...meta.tags];
   }
 
-  // Apply auto-links to content
   let processedContent = content;
-  if (linksToApply.length > 0) {
-    const pages = loadWikiPages();
-    processedContent = applyLinks(content, linksToApply, pages);
+  const pages = loadWikiPages();
 
-    // Add linked pages to related (deduped)
-    for (const ls of linksToApply) {
-      if (!meta.related.includes(ls)) {
-        meta.related.push(ls);
+  // Read local links JSON if it exists
+  const localFile = join(PUBLISH_DIR, 'local-links.json');
+  if (existsSync(localFile)) {
+    try {
+      const localData = JSON.parse(readFileSync(localFile, 'utf-8'));
+      const selectedLocal = (localData.links || [])
+        .filter((l) => l.include)
+        .map((l) => l.slug);
+
+      if (selectedLocal.length > 0) {
+        processedContent = applyLocalLinks(processedContent, selectedLocal, pages);
+        for (const ls of selectedLocal) {
+          if (!meta.related.includes(ls)) meta.related.push(ls);
+        }
+      }
+    } catch { /* ignore bad JSON */ }
+  }
+
+  // Read Wikipedia links JSON if it exists
+  const wikiFile = join(PUBLISH_DIR, 'wikipedia-links.json');
+  if (existsSync(wikiFile)) {
+    try {
+      const wikiData = JSON.parse(readFileSync(wikiFile, 'utf-8'));
+      const selectedWiki = (wikiData.links || [])
+        .filter((l) => l.include)
+        .map((l) => ({ term: l.term, url: l.url }));
+
+      if (selectedWiki.length > 0) {
+        processedContent = applyWikipediaLinks(processedContent, selectedWiki);
+      }
+    } catch { /* ignore bad JSON */ }
+  }
+
+  // Also support legacy CSV-based local links (backward compat)
+  const legacyLinks = process.argv[4] || '';
+  if (legacyLinks) {
+    const slugs = legacyLinks.split(',').filter(Boolean);
+    if (slugs.length > 0) {
+      processedContent = applyLocalLinks(processedContent, slugs, pages);
+      for (const ls of slugs) {
+        if (!meta.related.includes(ls)) meta.related.push(ls);
       }
     }
   }
@@ -319,13 +488,13 @@ if (command === 'detect-links') {
   // Write to wiki/
   const output = serializeFrontmatter(meta, processedContent);
   writeFileSync(join(WIKI_DIR, `${slug}.md`), output, 'utf-8');
-
   process.stdout.write(`PUBLISHED ${slug}\n`);
+
 } else {
   process.stderr.write(
     'Usage:\n' +
-      '  publish-helper.js detect-links <draft-file>\n' +
-      '  publish-helper.js publish <draft-file> [links-csv]\n'
+    '  publish-helper.js generate-link-files <draft-file>\n' +
+    '  publish-helper.js publish <draft-file>\n'
   );
   process.exit(1);
 }

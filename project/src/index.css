@@ -29,6 +29,14 @@
     --tag-subject: 210 70% 50%;
     --tag-topic: 150 60% 40%;
     --tag-subtopic: 40 70% 50%;
+
+    /* Link type colors — light mode */
+    --link-local: 221 83% 53%;
+    --link-local-visited: 221 83% 38%;
+    --link-wikipedia: 162 63% 38%;
+    --link-wikipedia-visited: 162 63% 26%;
+    --link-external: 271 54% 50%;
+    --link-external-visited: 271 54% 36%;
   }
 
   .dark {
@@ -56,6 +64,14 @@
     --tag-subject: 210 70% 70%;
     --tag-topic: 150 60% 60%;
     --tag-subtopic: 40 70% 70%;
+
+    /* Link type colors — dark mode */
+    --link-local: 217 91% 60%;
+    --link-local-visited: 217 91% 45%;
+    --link-wikipedia: 162 63% 55%;
+    --link-wikipedia-visited: 162 63% 40%;
+    --link-external: 271 54% 65%;
+    --link-external-visited: 271 54% 48%;
   }
 }
 
@@ -67,6 +83,80 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Link type styles — local, wikipedia, external
+   ═══════════════════════════════════════════════════════════ */
+
+/* Local wiki links */
+a.link-local {
+  color: hsl(var(--link-local));
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: hsl(var(--link-local) / 0.4);
+  transition: color 150ms, text-decoration-color 150ms;
+}
+a.link-local:hover {
+  text-decoration-color: hsl(var(--link-local));
+}
+a.link-local:visited {
+  color: hsl(var(--link-local-visited));
+  text-decoration-color: hsl(var(--link-local-visited) / 0.4);
+}
+
+/* Wikipedia links */
+a.link-wikipedia {
+  color: hsl(var(--link-wikipedia));
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
+  text-decoration-color: hsl(var(--link-wikipedia) / 0.5);
+  transition: color 150ms, text-decoration-color 150ms;
+}
+a.link-wikipedia:hover {
+  text-decoration-color: hsl(var(--link-wikipedia));
+}
+a.link-wikipedia:visited {
+  color: hsl(var(--link-wikipedia-visited));
+  text-decoration-color: hsl(var(--link-wikipedia-visited) / 0.5);
+}
+
+/* External links */
+a.link-external {
+  color: hsl(var(--link-external));
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: hsl(var(--link-external) / 0.5);
+  transition: color 150ms, text-decoration-color 150ms;
+}
+a.link-external:hover {
+  text-decoration-color: hsl(var(--link-external));
+}
+a.link-external:visited {
+  color: hsl(var(--link-external-visited));
+  text-decoration-color: hsl(var(--link-external-visited) / 0.5);
+}
+
+/* Wikipedia "W" indicator */
+.wiki-indicator {
+  font-size: 0.6em;
+  font-weight: 700;
+  vertical-align: super;
+  margin-left: 1px;
+  opacity: 0.6;
+  letter-spacing: -0.02em;
+}
+
+/* External link arrow indicator */
+.external-indicator {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-left: 2px;
+  vertical-align: middle;
+  opacity: 0.5;
 }
 
 @layer utilities {
