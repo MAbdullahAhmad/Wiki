@@ -38,7 +38,7 @@ function wikiDevPlugin() {
 
 export default defineConfig({
   plugins: [react(), wikiDevPlugin()],
-  base: '/Wiki/',
+  base: './',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

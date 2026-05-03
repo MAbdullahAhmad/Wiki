@@ -62,7 +62,7 @@ export function LinkPreview({ slug, children }: LinkPreviewProps) {
   const handleClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     if (e.ctrlKey || e.metaKey) {
-      window.open(`${window.location.origin}${import.meta.env.BASE_URL}#/page/${slug}`, '_blank');
+      window.open(`${window.location.href.split('#')[0]}#/page/${slug}`, '_blank');
     } else {
       navigate(`/page/${slug}`);
     }

@@ -5,7 +5,7 @@ export const CONFIG = {
   REPO_NAME: 'Wiki',
   BRANCH: 'main',
   WIKI_DIR: 'wiki',
-  BASE_URL: '/Wiki/',
+  BASE_URL: './',
   get RAW_BASE() {
     return `https://raw.githubusercontent.com/${this.REPO_OWNER}/${this.REPO_NAME}/${this.BRANCH}/${this.WIKI_DIR}`;
   },

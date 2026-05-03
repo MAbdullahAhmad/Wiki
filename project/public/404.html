@@ -2,19 +2,37 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Wiki - Page Not Found</title>
+    <title>Wiki - Redirecting</title>
     <script>
-      // Single Page Apps for GitHub Pages
-      // Redirect all 404s to index with the path in a query param
-      var pathSegmentsToKeep = 1;
-      var l = window.location;
-      l.replace(
-        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
-        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
-        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
-        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
-        l.hash
-      );
+      // SPA redirect for GitHub Pages (works at any base path)
+      // With HashRouter, just redirect to the same directory's index
+      // preserving the hash. If the path has extra segments beyond the
+      // base, convert them into a hash route.
+      (function() {
+        var loc = window.location;
+        // Find the base: everything up to and including the repo directory
+        // For /Wiki/page/foo → base=/Wiki/, rest=page/foo
+        // For /page/foo      → base=/,      rest=page/foo
+        var segments = loc.pathname.replace(/\/+$/, '').split('/');
+        // Try to find index.html's directory by walking up
+        // GitHub Pages serves 404.html for any unknown path under the base
+        // The base is the first directory that GitHub recognizes
+        var hash = loc.hash;
+        if (!hash && segments.length > 1) {
+          // Convert leftover path segments into a hash route
+          // e.g. /Wiki/page/foo → /Wiki/#/page/foo
+          // Heuristic: keep the first segment if it looks like a repo name
+          var base = '/' + segments.slice(1, 2).join('/') + '/';
+          var rest = segments.slice(2).join('/');
+          if (rest) {
+            hash = '#/' + rest;
+          }
+          loc.replace(base + (loc.search || '') + hash);
+        } else {
+          // Already has a hash or is at root — just go to the base
+          loc.replace(loc.pathname.split('/').slice(0, 2).join('/') + '/' + (loc.search || '') + hash);
+        }
+      })();
     </script>
   </head>
   <body></body>
