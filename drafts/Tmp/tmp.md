@@ -10,4 +10,4 @@ related:
 
 # Tmp
 
-Tmp. I hope you know about Machine Learning or may be related to artificial intelligence and web-development. Serach web for some other stuff also.
+Tmp. I hope you know about Machine Learning or may be related to artificial intelligence and web-development. Serach web for some other stuff also. how about **palindrome** ?

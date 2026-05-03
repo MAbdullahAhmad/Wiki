@@ -818,16 +818,19 @@
         }
       ],
       "related": [
-        "python-programming"
+        "python-programming",
+        "artificial-intelligence",
+        "machine-learning"
       ],
-      "excerpt": "Tmp. I hope you know about Machine Learning or may be related to artificial intelligence and web-development. Serach web for some other stuff also.",
+      "excerpt": "Tmp. I hope you know about [Machine Learning](machine-learning) or may be related to [artificial intelligence](artificial-intelligence) and web-development. Serach web for some other stuff also. how about **[palindrome](https://en.wikipedia.org/wiki/Palindrome)** ?",
       "sections": [
         "Tmp"
       ],
       "keywords": [
+        "[palindrome](https://en.wikipedia.org/wiki/Palindrome)",
         "Tmp"
       ],
-      "wordCount": 26
+      "wordCount": 30
     },
     {
       "slug": "web-development",
@@ -908,5 +911,5 @@
     },
     "Tmp": {}
   },
-  "generatedAt": "2026-05-03T22:36:03.343Z"
+  "generatedAt": "2026-05-03T22:42:03.414Z"
 }
