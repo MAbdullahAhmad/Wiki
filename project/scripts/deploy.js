@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Deploys the built project to the 'pages' branch for GitHub Pages.
+ * Deploys the built project to the 'gh-pages' branch for GitHub Pages.
  *
  * Uses a temp directory approach — never switches branches or deletes
  * files in the working tree, so the user's shell CWD stays valid.
@@ -9,7 +9,7 @@
  * Steps:
  * 1. Builds the project (generate index + tsc + vite build)
  * 2. Copies build output to a temp directory outside the repo
- * 3. Inits a fresh git repo there, commits, force-pushes to pages branch
+ * 3. Inits a fresh git repo there, commits, force-pushes to gh-pages branch
  * 4. Cleans up the temp directory
  */
 
@@ -56,14 +56,14 @@ async function main() {
     const remote = runCapture('git remote get-url origin');
     console.log(`  Remote: ${remote}`);
 
-    // Step 3: Init a fresh repo, commit, force-push to pages
-    console.log('\nStep 3: Deploying to pages branch...');
+    // Step 3: Init a fresh repo, commit, force-push to gh-pages
+    console.log('\nStep 3: Deploying to gh-pages branch...');
     run('git init', { cwd: tempDir });
-    run('git checkout -b pages', { cwd: tempDir });
+    run('git checkout -b gh-pages', { cwd: tempDir });
     run('git add -A', { cwd: tempDir });
     run(`git commit -m "Deploy wiki — ${new Date().toISOString()}"`, { cwd: tempDir });
     run(`git remote add origin ${remote}`, { cwd: tempDir });
-    run('git push --force origin pages', { cwd: tempDir });
+    run('git push --force origin gh-pages', { cwd: tempDir });
 
     console.log('\n=== Deploy complete! ===');
     console.log('Site: https://mabdullahahmad.github.io/Wiki/');

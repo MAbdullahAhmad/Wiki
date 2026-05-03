@@ -1,6 +1,6 @@
 # Wiki — Personal Knowledge Base
 
-A markdown-based personal wiki built with React, TypeScript, and Tailwind CSS. Content lives on `main`, the built site is force-pushed to `pages` and served by GitHub Pages.
+A markdown-based personal wiki built with React, TypeScript, and Tailwind CSS. Content lives on `main`, the built site is force-pushed to `gh-pages` and served by GitHub Pages.
 
 **Live:** [mabdullahahmad.github.io/Wiki/](https://mabdullahahmad.github.io/Wiki/)
 
@@ -35,7 +35,7 @@ Wiki/
 │   ├── scripts/
 │   │   ├── generate-index.js  # Builds _index.json (+ rotated chunks)
 │   │   ├── publish-helper.js  # Backend for publish.bash
-│   │   └── deploy.js          # Force-pushes built dist/ to `pages` branch
+│   │   └── deploy.js          # Force-pushes built dist/ to `gh-pages` branch
 │   └── package.json
 ├── publish.bash               # Interactive publish tool
 └── README.md
@@ -95,7 +95,7 @@ cd project
 npm run deploy
 ```
 
-This builds, then force-pushes `dist/` to the `pages` branch. The shell CWD never changes — deploy runs in a temp directory.
+This builds, then force-pushes `dist/` to the `gh-pages` branch. The shell CWD never changes — deploy runs in a temp directory.
 
 ## Page format
 
