@@ -37,7 +37,7 @@ export function HomePage() {
       <section className="relative py-20 px-4 text-center bg-gradient-to-b from-primary/5 to-background">
         <div className="max-w-3xl mx-auto">
           <h1 className="text-5xl font-bold tracking-tight mb-4">
-            Personal Wiki
+            Wiki by Abdullah
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             A knowledge base covering technology, science, and mathematics.

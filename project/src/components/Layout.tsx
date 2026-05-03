@@ -77,7 +77,7 @@ export function Layout({ children }: LayoutProps) {
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 font-bold text-lg">
             <BookOpen className="h-5 w-5 text-primary" />
-            <span>Wiki</span>
+            <span>Wiki by Abdullah</span>
           </Link>
 
           <div className="hidden sm:flex items-center gap-1">
@@ -136,7 +136,7 @@ export function Layout({ children }: LayoutProps) {
 
       <footer className="border-t border-border mt-16">
         <div className="max-w-6xl mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
-          Personal Wiki — Built with React & Markdown
+          Wiki by Abdullah
         </div>
       </footer>
     </div>
