@@ -27,6 +27,7 @@ DRAFTS_DIR="$REPO_ROOT/drafts"
 WIKI_DIR="$REPO_ROOT/wiki"
 PROJECT_DIR="$REPO_ROOT/project"
 HELPER="$PROJECT_DIR/scripts/publish-helper.js"
+WIKI_SEARCH="$REPO_ROOT/scripts/wikipedia-search.sh"
 PUBLISH_DIR="$REPO_ROOT/.publish"
 
 # ── Colors ──
@@ -153,34 +154,41 @@ for idx in "${SELECTED_INDICES[@]}"; do
     echo -e "${CYAN}  ${BOLD}${rel_path}${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-    # Step 1: Generate link files (local + Wikipedia)
+    mkdir -p "$PUBLISH_DIR"
+    LOCAL_FILE="$PUBLISH_DIR/local-links.json"
+    WIKI_FILE="$PUBLISH_DIR/wikipedia-links.json"
+
+    # Step 1a: Generate local link suggestions
     echo ""
-    echo -e "  ${DIM}Scanning for linkable references & searching Wikipedia...${NC}"
+    echo -e "  ${DIM}Scanning for local wiki links...${NC}"
 
-    GEN_OUTPUT=$(node "$HELPER" generate-link-files "$file" 2>&1 || true)
-
-    LOCAL_COUNT=$(echo "$GEN_OUTPUT" | grep "^LOCAL:" | sed 's/LOCAL://')
-    WIKI_COUNT=$(echo "$GEN_OUTPUT" | grep "^WIKIPEDIA:" | sed 's/WIKIPEDIA://')
-    FILES_LINE=$(echo "$GEN_OUTPUT" | grep "^FILES:" | sed 's/FILES://')
-    LOCAL_FILE=$(echo "$FILES_LINE" | cut -d'|' -f1)
-    WIKI_FILE=$(echo "$FILES_LINE" | cut -d'|' -f2)
-
+    GEN_OUTPUT=$(node "$HELPER" generate-local-links "$file" 2>&1 || true)
+    LOCAL_COUNT=$(echo "$GEN_OUTPUT" | grep "^LOCAL:" | sed 's/LOCAL://' | tr -d '[:space:]')
     LOCAL_COUNT=${LOCAL_COUNT:-0}
-    WIKI_COUNT=${WIKI_COUNT:-0}
+
+    # Step 1b: Search Wikipedia for terms
+    echo -e "  ${DIM}Searching Wikipedia for relevant terms...${NC}"
+
+    WIKI_COUNT=0
+    if [ -x "$WIKI_SEARCH" ]; then
+        WIKI_COUNT=$(bash "$WIKI_SEARCH" "$file" "$WIKI_FILE" 2>/dev/null || echo 0)
+        WIKI_COUNT=$(echo "$WIKI_COUNT" | tr -d '[:space:]')
+        WIKI_COUNT=${WIKI_COUNT:-0}
+    fi
 
     echo ""
     echo -e "  ${GREEN}Found:${NC}"
     echo -e "    ${BLUE}Local wiki links:${NC}     ${BOLD}${LOCAL_COUNT}${NC} potential match(es)"
     echo -e "    ${MAGENTA}Wikipedia links:${NC}    ${BOLD}${WIKI_COUNT}${NC} potential match(es)"
 
-    if (( LOCAL_COUNT > 0 || WIKI_COUNT > 0 )); then
+    if [[ "$LOCAL_COUNT" -gt 0 || "$WIKI_COUNT" -gt 0 ]]; then
         echo ""
         echo -e "  ${BOLD}Review the link files and set ${GREEN}\"include\": true${NC}${BOLD} for links you want:${NC}"
 
-        if (( LOCAL_COUNT > 0 )); then
+        if [[ "$LOCAL_COUNT" -gt 0 ]]; then
             echo -e "    ${BLUE}Local:${NC}     ${DIM}${LOCAL_FILE}${NC}"
         fi
-        if (( WIKI_COUNT > 0 )); then
+        if [[ "$WIKI_COUNT" -gt 0 ]]; then
             echo -e "    ${MAGENTA}Wikipedia:${NC} ${DIM}${WIKI_FILE}${NC}"
         fi
 
@@ -201,16 +209,18 @@ for idx in "${SELECTED_INDICES[@]}"; do
         # Count how many links were actually applied
         APPLIED_LOCAL=0
         APPLIED_WIKI=0
-        if [ -f "$LOCAL_FILE" ] 2>/dev/null; then
-            APPLIED_LOCAL=$(grep -c '"include": true' "$LOCAL_FILE" 2>/dev/null || echo 0)
+        if [ -f "$LOCAL_FILE" ]; then
+            APPLIED_LOCAL=$(grep -c '"include": true' "$LOCAL_FILE" || true)
+            APPLIED_LOCAL=${APPLIED_LOCAL:-0}
         fi
-        if [ -f "$WIKI_FILE" ] 2>/dev/null; then
-            APPLIED_WIKI=$(grep -c '"include": true' "$WIKI_FILE" 2>/dev/null || echo 0)
+        if [ -f "$WIKI_FILE" ]; then
+            APPLIED_WIKI=$(grep -c '"include": true' "$WIKI_FILE" || true)
+            APPLIED_WIKI=${APPLIED_WIKI:-0}
         fi
 
         echo ""
         echo -e "  ${GREEN}Published${NC} → wiki/${pub_slug}.md"
-        if (( APPLIED_LOCAL > 0 || APPLIED_WIKI > 0 )); then
+        if [[ "$APPLIED_LOCAL" -gt 0 || "$APPLIED_WIKI" -gt 0 ]]; then
             echo -e "  ${DIM}Links applied: ${APPLIED_LOCAL} local, ${APPLIED_WIKI} Wikipedia${NC}"
         fi
         PUBLISHED=$((PUBLISHED + 1))

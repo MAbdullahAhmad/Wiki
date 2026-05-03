@@ -1,0 +1,147 @@
+# ═══════════════════════════════════════════════════════════════════
+# Wikipedia term extraction patterns
+# ═══════════════════════════════════════════════════════════════════
+# Each non-empty, non-comment line is a grep -oP regex pattern.
+# The matched output IS the term to search on Wikipedia.
+# Use \K to discard prefix context and (?=...) for suffix lookahead.
+#
+# Add new patterns anywhere — one per line.
+# ═══════════════════════════════════════════════════════════════════
+
+
+# ─── BETWEEN DELIMITERS ──────────────────────────────────────────
+
+# Bold phrases: **term**
+\*\*\K[^*]+(?=\*\*)
+
+# Section headings (H2, H3, H4)
+^#{2,4}\s+\K.+
+
+
+# ─── AFTER DEFINITIONAL VERBS ───────────────────────────────────
+
+# "is a / is an / is the [Term]"
+(?:is\s+(?:an?\s+|the\s+))\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "are [Term]"
+(?:are\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "refers to / refer to [Term]"
+(?:refers?\s+to\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "known as / also known as [Term]"
+(?:(?:also\s+)?known\s+as\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "called / termed / named [Term]"
+(?:(?:called|termed|named)\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+
+# ─── AFTER EXAMPLE / LIST PHRASES ───────────────────────────────
+
+# "such as [Term]"
+(?:such\s+as\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "including [Term]"
+(?:including\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "especially / particularly / notably [Term]"
+(?:(?:especially|particularly|notably)\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "for example [Term]" / "for instance [Term]"
+(?:for\s+(?:example|instance)\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "e.g. [Term]" / "i.e. [Term]"
+(?:(?:e\.g\.|i\.e\.),?\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "like [Term]" (when followed by a capitalized word)
+(?:like\s+)\K[A-Z][a-zA-Z]+(?: [A-Z][a-zA-Z]+){0,3}
+
+
+# ─── AFTER TAXONOMY / CLASSIFICATION PHRASES ────────────────────
+
+# "type of / form of / kind of / sort of [Term]"
+(?:(?:type|form|kind|sort)\s+of\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "branch of / field of / area of / domain of [Term]"
+(?:(?:branch|field|area|domain)\s+of\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "subset of / subfield of / subcategory of [Term]"
+(?:(?:subset|subfield|subcategory)\s+of\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "part of / component of / aspect of / element of [Term]"
+(?:(?:part|component|aspect|element)\s+of\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "category of / class of / family of [Term]"
+(?:(?:category|class|family)\s+of\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "example of / instance of [Term]"
+(?:(?:example|instance)\s+of\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+
+# ─── AFTER RELATION PHRASES ─────────────────────────────────────
+
+# "based on / built on / derived from [Term]"
+(?:(?:based|built)\s+on\s+|derived\s+from\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "related to / similar to / comparable to [Term]"
+(?:(?:related|similar|comparable)\s+to\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "inspired by [Term]"
+(?:inspired\s+by\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "variant of / extension of / generalization of [Term]"
+(?:(?:variant|extension|generalization|specialization)\s+of\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+
+# ─── AFTER CONCEPT / METHOD PHRASES ─────────────────────────────
+
+# "concept of / theory of / principle of / model of [Term]"
+(?:(?:concept|theory|principle|model|law)\s+of\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "method of / technique of / approach to [Term]"
+(?:(?:method|technique)\s+(?:of|for)\s+|approach\s+to\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "framework for / algorithm for / process of [Term]"
+(?:(?:framework|algorithm|protocol|architecture)\s+for\s+|process\s+of\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "application of / use of / study of [Term]"
+(?:(?:application|use|study)\s+of\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+
+# ─── AFTER ACTION VERBS ─────────────────────────────────────────
+
+# "involves / utilizes / employs / uses [Term]"
+(?:(?:involves|utilizes|employs|uses|combines)\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "enables / leverages / implements [Term]"
+(?:(?:enables|leverages|implements|introduces)\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+
+# ─── AFTER ATTRIBUTION PHRASES ──────────────────────────────────
+
+# "developed by / invented by / proposed by / created by [Term]"
+(?:(?:developed|invented|proposed|created|designed|pioneered|founded)\s+by\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+# "introduced in [Term]" (paper / year / context)
+(?:introduced\s+in\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}
+
+
+# ─── BEFORE DEFINITIONAL PHRASES (subject extraction) ───────────
+
+# "[Term] is a / is an" — subject of a definition
+[A-Z][a-zA-Z]+(?: [A-Z][a-zA-Z]+){0,3}(?=\s+is\s+an?\b)
+
+# "[Term] refers to"
+[A-Z][a-zA-Z]+(?: [A-Z][a-zA-Z]+){0,3}(?=\s+refers?\s+to\b)
+
+# "[Term] is defined as"
+[A-Z][a-zA-Z]+(?: [A-Z][a-zA-Z]+){0,3}(?=\s+is\s+defined\s+as\b)
+
+
+# ─── PARENTHETICAL DEFINITIONS ──────────────────────────────────
+
+# "(Term)" — parenthetical term or abbreviation
+\(\K[A-Z][A-Za-z]+(?: [A-Za-z]+){0,4}(?=\))
+
+# "aka [Term]" / "a.k.a. [Term]"
+(?:aka\s+|a\.k\.a\.\s+)\K[A-Z][a-zA-Z]+(?: [a-zA-Z]+){0,4}

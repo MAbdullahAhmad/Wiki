@@ -1,6 +1,7 @@
 /_notes
 /project/node_modules
 /project/dist
+/project/tsconfig.tsbuildinfo
 .deploy-temp
 .publish
 .DS_Store

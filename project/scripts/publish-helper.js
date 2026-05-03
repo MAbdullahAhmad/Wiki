@@ -4,14 +4,15 @@
  * publish-helper.js - Node.js helper for the publish.bash script
  *
  * Commands:
- *   generate-link-files <draft-file>
- *     Detects local wiki links and Wikipedia links.
- *     Writes .publish/local-links.json and .publish/wikipedia-links.json
- *     with include:false by default for user review.
+ *   generate-local-links <draft-file>
+ *     Detects mentions of existing wiki page titles in a draft.
+ *     Writes .publish/local-links.json with include:false for user review.
+ *     Output: LOCAL:<count>\nFILE:<path>
  *
  *   publish <draft-file>
- *     Reads .publish/*.json, applies links where include:true,
- *     updates frontmatter, copies to wiki/<slug>.md.
+ *     Reads .publish/local-links.json and .publish/wikipedia-links.json,
+ *     applies links where include:true, updates frontmatter tags from
+ *     directory structure, copies to wiki/<slug>.md.
  *     Output: "PUBLISHED <slug>" on success
  */
 
@@ -197,95 +198,6 @@ function detectLocalLinks(content, wikiPages, currentSlug) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Wikipedia link detection
-// ═══════════════════════════════════════════════════════════
-
-function extractWikipediaTerms(content, localTitles, pageTitle) {
-  const terms = new Map(); // term -> context
-  const localLower = new Set(localTitles.map((t) => t.toLowerCase()));
-  const cleaned = content
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/`[^`]+`/g, '');
-
-  // Bold phrases
-  const boldRegex = /\*\*([^*]+)\*\*/g;
-  let m;
-  while ((m = boldRegex.exec(cleaned)) !== null) {
-    const term = m[1].trim();
-    if (term.length < 3 || term.length > 80) continue;
-    if (term.toLowerCase() === pageTitle.toLowerCase()) continue;
-    if (localLower.has(term.toLowerCase())) continue;
-    if (!terms.has(term.toLowerCase())) {
-      const ctx = extractContext(cleaned, m.index, m[0].length);
-      terms.set(term.toLowerCase(), { term, context: ctx });
-    }
-  }
-
-  // Section headings (H2, H3, H4)
-  for (const line of cleaned.split('\n')) {
-    const hMatch = line.match(/^#{2,4}\s+(.+)/);
-    if (hMatch) {
-      const heading = hMatch[1].trim();
-      if (heading.length < 3 || heading.length > 80) continue;
-      if (heading.toLowerCase() === pageTitle.toLowerCase()) continue;
-      if (localLower.has(heading.toLowerCase())) continue;
-      if (!terms.has(heading.toLowerCase())) {
-        terms.set(heading.toLowerCase(), {
-          term: heading,
-          context: `Section heading: "${heading}"`,
-        });
-      }
-    }
-  }
-
-  return [...terms.values()].slice(0, 20);
-}
-
-async function searchWikipedia(term) {
-  try {
-    const url =
-      `https://en.wikipedia.org/w/api.php?action=query&list=search` +
-      `&srsearch=${encodeURIComponent(term)}&srlimit=1&utf8=1&format=json`;
-    const resp = await fetch(url);
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const results = data?.query?.search;
-    if (!results || results.length === 0) return null;
-
-    const r = results[0];
-    const title = r.title;
-    const snippet = r.snippet.replace(/<[^>]+>/g, '').slice(0, 200);
-    const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`;
-    return { title, snippet, url: wikiUrl };
-  } catch {
-    return null;
-  }
-}
-
-async function detectWikipediaLinks(content, localTitles, pageTitle) {
-  const candidates = extractWikipediaTerms(content, localTitles, pageTitle);
-  if (candidates.length === 0) return [];
-
-  const results = [];
-  for (const { term, context } of candidates) {
-    const result = await searchWikipedia(term);
-    if (result) {
-      results.push({
-        term,
-        wikipedia_title: result.title,
-        url: result.url,
-        description: result.snippet,
-        context,
-      });
-    }
-    // Small delay to be polite to Wikipedia API
-    await new Promise((r) => setTimeout(r, 80));
-  }
-
-  return results;
-}
-
-// ═══════════════════════════════════════════════════════════
 // Apply links to content
 // ═══════════════════════════════════════════════════════════
 
@@ -354,18 +266,15 @@ function applyWikipediaLinks(content, links) {
 
 const command = process.argv[2];
 
-if (command === 'generate-link-files') {
+if (command === 'generate-local-links') {
   const draftFile = resolve(process.argv[3]);
   const raw = readFileSync(draftFile, 'utf-8');
-  const { meta, content } = parseFrontmatter(raw);
+  const { content } = parseFrontmatter(raw);
   const slug = basename(draftFile, '.md');
-  const pageTitle = meta.title || slugToTitle(slug);
   const pages = loadWikiPages();
-  const localTitles = pages.map((p) => p.title);
 
   mkdirSync(PUBLISH_DIR, { recursive: true });
 
-  // Detect local links
   const localDetected = detectLocalLinks(content, pages, slug);
   const localFile = join(PUBLISH_DIR, 'local-links.json');
   writeFileSync(
@@ -388,35 +297,8 @@ if (command === 'generate-link-files') {
     'utf-8'
   );
 
-  // Detect Wikipedia links
-  process.stderr.write('Searching Wikipedia...\n');
-  const wikiDetected = await detectWikipediaLinks(content, localTitles, pageTitle);
-  const wikiFile = join(PUBLISH_DIR, 'wikipedia-links.json');
-  writeFileSync(
-    wikiFile,
-    JSON.stringify(
-      {
-        _info: 'Set "include" to true for Wikipedia links you want to add. Save the file, then press Enter in terminal.',
-        _file: basename(draftFile),
-        links: wikiDetected.map((d) => ({
-          include: false,
-          term: d.term,
-          wikipedia_title: d.wikipedia_title,
-          url: d.url,
-          description: d.description,
-          context: d.context,
-        })),
-      },
-      null,
-      2
-    ),
-    'utf-8'
-  );
-
-  // Output summary
   process.stdout.write(`LOCAL:${localDetected.length}\n`);
-  process.stdout.write(`WIKIPEDIA:${wikiDetected.length}\n`);
-  process.stdout.write(`FILES:${localFile}|${wikiFile}\n`);
+  process.stdout.write(`FILE:${localFile}\n`);
 
 } else if (command === 'publish') {
   const draftFile = resolve(process.argv[3]);
@@ -424,13 +306,11 @@ if (command === 'generate-link-files') {
   const { meta, content } = parseFrontmatter(raw);
   const slug = basename(draftFile, '.md');
 
-  // Ensure basic metadata
   if (!meta.title) meta.title = slugToTitle(slug);
   if (!meta.description) meta.description = '';
   if (!Array.isArray(meta.tags)) meta.tags = [];
   if (!Array.isArray(meta.related)) meta.related = [];
 
-  // Derive tag from directory structure
   const derivedTag = deriveTagFromPath(draftFile, meta.title);
   if (derivedTag) {
     meta.tags = meta.tags.filter((t) => t.type !== derivedTag.type);
@@ -440,7 +320,7 @@ if (command === 'generate-link-files') {
   let processedContent = content;
   const pages = loadWikiPages();
 
-  // Read local links JSON if it exists
+  // Apply local links from JSON
   const localFile = join(PUBLISH_DIR, 'local-links.json');
   if (existsSync(localFile)) {
     try {
@@ -458,7 +338,7 @@ if (command === 'generate-link-files') {
     } catch { /* ignore bad JSON */ }
   }
 
-  // Read Wikipedia links JSON if it exists
+  // Apply Wikipedia links from JSON
   const wikiFile = join(PUBLISH_DIR, 'wikipedia-links.json');
   if (existsSync(wikiFile)) {
     try {
@@ -473,19 +353,6 @@ if (command === 'generate-link-files') {
     } catch { /* ignore bad JSON */ }
   }
 
-  // Also support legacy CSV-based local links (backward compat)
-  const legacyLinks = process.argv[4] || '';
-  if (legacyLinks) {
-    const slugs = legacyLinks.split(',').filter(Boolean);
-    if (slugs.length > 0) {
-      processedContent = applyLocalLinks(processedContent, slugs, pages);
-      for (const ls of slugs) {
-        if (!meta.related.includes(ls)) meta.related.push(ls);
-      }
-    }
-  }
-
-  // Write to wiki/
   const output = serializeFrontmatter(meta, processedContent);
   writeFileSync(join(WIKI_DIR, `${slug}.md`), output, 'utf-8');
   process.stdout.write(`PUBLISHED ${slug}\n`);
@@ -493,7 +360,7 @@ if (command === 'generate-link-files') {
 } else {
   process.stderr.write(
     'Usage:\n' +
-    '  publish-helper.js generate-link-files <draft-file>\n' +
+    '  publish-helper.js generate-local-links <draft-file>\n' +
     '  publish-helper.js publish <draft-file>\n'
   );
   process.exit(1);
