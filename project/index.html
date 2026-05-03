@@ -6,6 +6,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wiki - Personal Knowledge Base</title>
     <meta name="description" content="A personal markdown-based wiki and knowledge base" />
+    <script>
+      // Pair with public/404.html: if a 404 stashed a route, restore it as
+      // a hash route before React mounts so HashRouter picks it up.
+      (function () {
+        try {
+          var pathKey = '__spa_redirect_path__';
+          var redirectKey = '__spa_redirect_in_flight__';
+          var stashed = sessionStorage.getItem(pathKey);
+          if (stashed) {
+            sessionStorage.removeItem(pathKey);
+            sessionStorage.removeItem(redirectKey);
+            window.location.hash = '#' + stashed;
+          }
+        } catch (e) { /* ignore */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

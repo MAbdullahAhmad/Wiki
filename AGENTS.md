@@ -27,10 +27,11 @@ npx vite build               # Production build
 ## Key Architecture
 - **Drafts**: `drafts/` organized as `<Domain>/<Subject>/<file>.md` (topics) or `<Domain>/<Subject>/<Topic>/<file>.md` (subtopics)
 - **Published wiki**: `wiki/*.md` flat directory with YAML frontmatter (title, description, tags, related)
-- **Publish tool**: `publish.bash` calls `project/scripts/publish-helper.js` for link detection, frontmatter management, and tag derivation
-- **Index**: `project/scripts/generate-index.js` builds `wiki/_index.json` with pages, taxonomy (auto-built from drafts/ directory structure), excerpts, keywords, word counts
+- **Assets**: `assets/` at repo root holds images and binaries; markdown references them as `assets/<path>`. Renderer rewrites to raw GitHub URL in prod; vite middleware serves them in dev. Publish step fails if any reference is missing.
+- **Publish tool**: `publish.bash` calls `project/scripts/publish-helper.js` for asset validation, link detection, frontmatter management, and tag derivation
+- **Index rotation**: `project/scripts/generate-index.js` writes `wiki/_index.json` (base, with taxonomy + first slice + `chunks: N`) plus `_index-1.json`, `_index-2.json`, … each capped at 10 MB. Both the frontend (`wikiService.ts`) and the publish helper (`loadWikiPages`) merge chunks transparently.
 - **React app**: `project/src/` (Vite + React + TypeScript + Tailwind)
-- **Routing**: HashRouter for GitHub Pages compatibility
+- **Routing**: HashRouter for GitHub Pages compatibility; `public/404.html` + inline script in `index.html` provide a session-stashed SPA fallback that redirects only once to avoid reload loops.
 - **Data fetching**: Runtime fetch from GitHub raw content URLs (prod) or local files (dev)
 - **Tag hierarchy**: Domain > Subject > Topic > Sub-topic (auto-derived from drafts/ dirs)
 

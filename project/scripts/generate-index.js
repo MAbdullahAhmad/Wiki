@@ -6,13 +6,18 @@
  * Auto-builds the taxonomy from the drafts/ directory structure.
  */
 
-import { readdir, readFile, writeFile, stat } from 'fs/promises';
+import { readdir, readFile, writeFile, stat, unlink } from 'fs/promises';
 import { join, resolve, basename } from 'path';
 import { existsSync } from 'fs';
 
 const WIKI_DIR = resolve(import.meta.dirname, '../../wiki');
 const DRAFTS_DIR = resolve(import.meta.dirname, '../../drafts');
 const OUTPUT = join(WIKI_DIR, '_index.json');
+
+// Max bytes for any single index file (base or chunk). Pages are split greedily
+// across `_index.json` (base, also holds taxonomy) and `_index-1.json`,
+// `_index-2.json`, … so each file stays under this size.
+const CHUNK_BYTES = 10 * 1024 * 1024;
 
 // Fallback taxonomy (used when drafts/ doesn't exist)
 const FALLBACK_TAXONOMY = {
@@ -249,15 +254,70 @@ async function main() {
   pages.sort((a, b) => a.title.localeCompare(b.title));
 
   const taxonomy = await buildTaxonomyFromDrafts();
+  const generatedAt = new Date().toISOString();
 
-  const index = {
-    pages,
+  // Remove any pre-existing rotated chunks so stale ones never linger.
+  const existingFiles = await readdir(WIKI_DIR);
+  for (const f of existingFiles) {
+    if (/^_index-\d+\.json$/.test(f)) {
+      await unlink(join(WIKI_DIR, f));
+    }
+  }
+
+  // Greedy split: fill the base file (which also carries taxonomy) up to
+  // CHUNK_BYTES, then spill remaining pages into _index-1.json, _index-2.json…
+  const slices = [];
+  let current = [];
+  let currentBytes = 0;
+  let isFirst = true;
+
+  const overheadBytes = (firstChunk) =>
+    Buffer.byteLength(
+      JSON.stringify(
+        firstChunk
+          ? { pages: [], taxonomy, generatedAt, chunks: 0 }
+          : { pages: [] },
+        null,
+        2
+      ),
+      'utf-8'
+    );
+
+  let budget = CHUNK_BYTES - overheadBytes(true);
+
+  for (const page of pages) {
+    const pageBytes = Buffer.byteLength(JSON.stringify(page, null, 2), 'utf-8') + 4; // ", "
+    if (current.length > 0 && currentBytes + pageBytes > budget) {
+      slices.push(current);
+      current = [];
+      currentBytes = 0;
+      isFirst = false;
+      budget = CHUNK_BYTES - overheadBytes(false);
+    }
+    current.push(page);
+    currentBytes += pageBytes;
+  }
+  if (current.length > 0 || slices.length === 0) slices.push(current);
+
+  const chunks = Math.max(slices.length - 1, 0);
+  const base = {
+    pages: slices[0] || [],
     taxonomy,
-    generatedAt: new Date().toISOString(),
+    generatedAt,
+    chunks,
   };
+  await writeFile(OUTPUT, JSON.stringify(base, null, 2), 'utf-8');
 
-  await writeFile(OUTPUT, JSON.stringify(index, null, 2), 'utf-8');
-  console.log(`Generated index with ${pages.length} pages at ${OUTPUT}`);
+  for (let i = 1; i < slices.length; i++) {
+    const chunkPath = join(WIKI_DIR, `_index-${i}.json`);
+    await writeFile(chunkPath, JSON.stringify({ pages: slices[i] }, null, 2), 'utf-8');
+  }
+
+  if (chunks > 0) {
+    console.log(`Generated index with ${pages.length} pages, split into base + ${chunks} chunk(s) at ${WIKI_DIR}`);
+  } else {
+    console.log(`Generated index with ${pages.length} pages at ${OUTPUT}`);
+  }
 }
 
 main().catch((err) => {

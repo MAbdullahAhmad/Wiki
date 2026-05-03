@@ -5,6 +5,7 @@ import rehypeSlug from 'rehype-slug';
 import { ExternalLink } from 'lucide-react';
 import { LinkPreview } from './LinkPreview';
 import { useWikiIndex } from '@/hooks/useWikiIndex';
+import { CONFIG } from '@/config';
 import type { Components } from 'react-markdown';
 import type { ReactNode } from 'react';
 
@@ -16,12 +17,30 @@ function isWikipediaUrl(href: string): boolean {
   return /^https?:\/\/([a-z]+\.)?wikipedia\.org\//i.test(href);
 }
 
+function isAssetPath(p: string): boolean {
+  return /^\.?\/?assets\//.test(p);
+}
+
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const { index } = useWikiIndex();
   const slugs = new Set(index?.pages.map((p) => p.slug) || []);
 
   const components: Components = {
+    img: ({ src, alt, ...props }) => {
+      const resolved = src && isAssetPath(src) ? CONFIG.getAssetUrl(src) : src;
+      return <img src={resolved} alt={alt || ''} className="max-w-full rounded-md my-4" {...props} />;
+    },
     a: ({ href, children, ...props }) => {
+      // Asset link (downloads, PDFs, etc.)
+      if (href && isAssetPath(href)) {
+        return (
+          <a href={CONFIG.getAssetUrl(href)} target="_blank" rel="noopener noreferrer" className="link-external" {...props}>
+            {children}
+            <ExternalLink className="external-indicator" />
+          </a>
+        );
+      }
+
       // Local wiki link (relative slug)
       if (href && !href.startsWith('http') && !href.startsWith('#')) {
         const slug = href.replace(/\.md$/, '').replace(/^\//, '');

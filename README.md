@@ -1,88 +1,103 @@
-# Wiki - Personal Knowledge Base
+# Wiki — Personal Knowledge Base
 
-A markdown-based personal wiki/encyclopedia built with React, TypeScript, and Tailwind CSS. Browse topics across Technology, Science, and Mathematics with hierarchical tagging, full-text search, and Wikipedia-style link previews.
+A markdown-based personal wiki built with React, TypeScript, and Tailwind CSS. Content lives on `main`, the built site is force-pushed to `pages` and served by GitHub Pages.
 
-**Live:** [mabdullahahmad.github.io/Wiki](https://mabdullahahmad.github.io/Wiki/)
+**Live:** [mabdullahahmad.github.io/Wiki/](https://mabdullahahmad.github.io/Wiki/)
+
+The canonical URL is case-sensitive (`/Wiki/`, not `/wiki/`). GitHub user-pages routing is owned by the `mabdullahahmad.github.io` repo, so the lowercase variant cannot be redirected from this repo alone.
 
 ## Features
 
-- **Markdown Content** - Write wiki pages in plain markdown with YAML frontmatter
-- **Hierarchical Tags** - Organize pages by Domain > Subject > Topic > Sub-topic with color-coded badges
-- **Full-Screen Search** - Search across all pages, titles, descriptions, tags, excerpts, and keywords
-- **Link Previews** - Hover over any wiki link to see a preview popup (like Wikipedia)
-- **Tag Breadcrumbs** - Hover over a tag to see its full hierarchy in a notification-style breadcrumb
-- **Related Pages** - Each page can link to related topics
-- **Publish Tool** - Interactive CLI to publish drafts with auto-link detection
-- **GitHub Pages** - Built site served from the `pages` branch, fetches content from main
+- Markdown content with YAML frontmatter
+- Hierarchical tags (Domain → Subject → Topic → Sub-topic), color-coded
+- Full-screen search across titles, descriptions, tags, excerpts, keywords
+- Hover link previews for in-wiki links
+- Wikipedia link detection in published markdown
+- Image and asset support via `assets/` directory
+- Index rotation: index file is auto-split into ≤ 10 MB chunks as it grows
+- Interactive publish CLI with link suggestions and asset validation
+- SPA-safe 404 handler for GitHub Pages
 
-## Structure
+## Repository structure
 
 ```
 Wiki/
-├── drafts/                  # Source of truth - organize by hierarchy
-│   ├── Technology/
-│   │   └── Computer Science/
-│   │       ├── algorithms.md              # Topic-level page
-│   │       ├── Artificial Intelligence/
-│   │       │   ├── machine-learning.md    # Sub-topic page
-│   │       │   └── deep-learning.md
-│   │       └── ...
-│   └── Science/
-│       ├── Physics/
-│       └── Mathematics/
-├── wiki/                    # Published pages (flat, auto-managed)
-│   ├── _index.json          # Auto-generated index with metadata
-│   └── *.md                 # Published markdown files
-├── project/                 # React application
-│   ├── src/                 # App source code
+├── drafts/                    # Source — organize by hierarchy
+│   └── <Domain>/<Subject>/[<Topic>/]<file>.md
+├── wiki/                      # Published — flat
+│   ├── _index.json            # Base index (taxonomy + first chunk of pages)
+│   ├── _index-1.json          # Rotated chunk (only if pages spill over 10 MB)
+│   ├── _index-2.json          # …
+│   └── *.md                   # Published markdown
+├── assets/                    # Images and binaries referenced by markdown
+├── project/                   # React app (Vite + TS + Tailwind)
+│   ├── src/
 │   ├── scripts/
-│   │   ├── generate-index.js   # Builds _index.json + taxonomy
-│   │   ├── publish-helper.js   # Backend for publish.bash
-│   │   └── deploy.js           # Deploys to pages branch
+│   │   ├── generate-index.js  # Builds _index.json (+ rotated chunks)
+│   │   ├── publish-helper.js  # Backend for publish.bash
+│   │   └── deploy.js          # Force-pushes built dist/ to `pages` branch
 │   └── package.json
-├── publish.bash             # Interactive publish tool
+├── publish.bash               # Interactive publish tool
 └── README.md
 ```
 
-## Workflow: Adding & Publishing Pages
+## Workflow
 
 ### 1. Create a draft
 
-Place your markdown file in `drafts/` following the directory hierarchy:
+Place a markdown file under `drafts/`:
 
 ```
-drafts/<Domain>/<Subject>/<file>.md          → tagged as topic
-drafts/<Domain>/<Subject>/<Topic>/<file>.md  → tagged as subtopic
+drafts/<Domain>/<Subject>/<file>.md           → tagged as topic
+drafts/<Domain>/<Subject>/<Topic>/<file>.md   → tagged as subtopic
 ```
 
-Tags are **automatically derived** from the directory path. The filename becomes the slug.
+Tags are derived from the directory path; the filename becomes the slug. The taxonomy shown on the home page is built directly from the `drafts/` directory tree.
 
-### 2. Publish
+### 2. Add assets (optional)
+
+Drop images and any other files into `assets/` at the repo root. Reference them from markdown by **relative path**:
+
+```markdown
+![diagram](assets/architecture.png)
+[whitepaper PDF](assets/foo.pdf)
+```
+
+Path resolution:
+
+- **Dev** — Vite middleware serves the local `assets/` directory at `/assets/…`.
+- **Prod** — the renderer rewrites `assets/<path>` to `https://raw.githubusercontent.com/<owner>/<repo>/main/assets/<path>`.
+
+The path you write in the markdown stays as-is in the published file (`assets/foo.png`). The renderer is the only thing that rewrites it.
+
+If your draft references a file that doesn't exist under `assets/`, **publishing fails** with a list of missing paths. Add the file (or fix the path) and re-publish.
+
+### 3. Publish
 
 ```bash
-./publish.bash              # Interactive: pick which drafts to publish
-./publish.bash --all        # Publish everything
-./publish.bash myfile.md    # Publish a specific file
+./publish.bash               # Interactive picker
+./publish.bash --all         # Publish everything
+./publish.bash myfile.md     # Publish a specific file
 ```
 
-The publish tool will:
-- Auto-detect mentions of existing wiki page titles in your content
-- Let you select which to convert to `[linked text](slug)` markdown links
-- Derive the correct tag type from the directory structure
-- Copy the processed file to `wiki/<slug>.md`
-- Regenerate the search index with excerpts, keywords, and updated taxonomy
+The tool will:
 
-### 3. Deploy
+1. Validate that every `assets/*` reference resolves.
+2. Detect mentions of existing wiki page titles → let you opt-in to convert them to `[text](slug)` wiki links.
+3. Search Wikipedia for related terms → let you opt-in to add `W`-marked external links.
+4. Apply the selected links and write `wiki/<slug>.md` with derived tag frontmatter.
+5. Regenerate `wiki/_index.json` and any rotated chunks.
+
+### 4. Deploy
 
 ```bash
 cd project
-npm run deploy              # Build and push to pages branch
-git push origin pages       # Publish to GitHub Pages
+npm run deploy
 ```
 
-## Wiki Page Format
+This builds, then force-pushes `dist/` to the `pages` branch. The shell CWD never changes — deploy runs in a temp directory.
 
-Each markdown file uses YAML frontmatter:
+## Page format
 
 ```markdown
 ---
@@ -98,32 +113,48 @@ related:
 
 # Machine Learning
 
-Content here...
+Content here, with optional ![image](assets/ml.png).
 ```
 
-### Tag Types
+### Tag types
 
-| Type | Color | Description |
-|------|-------|-------------|
-| **domain** | Purple | Top-level category (Technology, Science) |
-| **subject** | Blue | Subject within a domain (Computer Science, Physics) |
-| **topic** | Green | Specific topic (Artificial Intelligence, Calculus) |
-| **subtopic** | Amber | Sub-topic within a topic (Machine Learning, Deep Learning) |
+| Type     | Color  | Description                                                  |
+| -------- | ------ | ------------------------------------------------------------ |
+| domain   | Purple | Top-level category (Technology, Science, Internal, …)        |
+| subject  | Blue   | Subject within a domain (Computer Science, Physics, …)       |
+| topic    | Green  | Specific topic (Artificial Intelligence, Calculus, …)        |
+| subtopic | Amber  | Sub-topic within a topic (Machine Learning, Deep Learning, …) |
+
+## Index rotation
+
+`wiki/_index.json` is the search-and-navigation index. As content grows, the writer ([project/scripts/generate-index.js](project/scripts/generate-index.js)) caps every output file at 10 MB:
+
+- Base file `_index.json` always holds the taxonomy, generation timestamp, a `chunks: N` field, and as many pages as fit.
+- Remaining pages spill into `_index-1.json`, `_index-2.json`, … — each `{ "pages": [...] }` only.
+- Stale chunk files are deleted at the start of every regenerate.
+
+Both readers — the frontend ([project/src/services/wikiService.ts](project/src/services/wikiService.ts)) and the publish tool ([project/scripts/publish-helper.js](project/scripts/publish-helper.js)) — read the base, then fetch and concatenate `chunks` follow-on files. Code that consumes the index sees a single flat `pages[]`.
+
+## Routing & GitHub Pages SPA fallback
+
+The app uses HashRouter, so canonical URLs look like `https://mabdullahahmad.github.io/Wiki/#/page/<slug>`.
+
+If a user lands on a non-existent path under `/Wiki/`, GitHub serves [project/public/404.html](project/public/404.html). It stashes the requested path in `sessionStorage` and redirects to the base path **once** (a session sentinel prevents reload loops). [project/index.html](project/index.html) reads the stash on load and applies it as a hash route. If the stash isn't there or the redirect already fired this session, the 404 simply renders a "Page not found" message instead of looping.
 
 ## Development
 
 ```bash
 cd project
 npm install
-npm run generate-index   # Generate wiki/_index.json
-npm run dev              # Start dev server
+npm run generate-index   # Build wiki/_index.json (+ chunks if needed)
+npm run dev              # Start Vite dev server (serves wiki/ and assets/)
+npm run build            # Generate index + tsc + vite build
+npm run deploy           # Full deploy to pages branch
 ```
 
-## Tech Stack
+## Tech stack
 
-- **React 18** + **TypeScript** - UI framework
-- **Vite** - Build tool
-- **Tailwind CSS** - Styling
-- **shadcn/ui** - UI components
-- **react-markdown** - Markdown rendering
-- **react-router-dom** - Client-side routing (HashRouter for GitHub Pages)
+- React 18 + TypeScript + Vite
+- Tailwind CSS + shadcn/ui
+- react-markdown, remark-gfm, rehype-raw, rehype-slug
+- react-router-dom (HashRouter)

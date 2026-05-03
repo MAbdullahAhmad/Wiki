@@ -27,6 +27,7 @@ import { basename, relative, resolve, join } from 'path';
 const REPO_ROOT = resolve(import.meta.dirname, '../..');
 const DRAFTS_DIR = resolve(REPO_ROOT, 'drafts');
 const WIKI_DIR = resolve(REPO_ROOT, 'wiki');
+const ASSETS_DIR = resolve(REPO_ROOT, 'assets');
 const PUBLISH_DIR = resolve(REPO_ROOT, '.publish');
 
 // ═══════════════════════════════════════════════════════════
@@ -148,7 +149,18 @@ function loadWikiPages() {
   const indexPath = join(WIKI_DIR, '_index.json');
   if (!existsSync(indexPath)) return [];
   try {
-    return JSON.parse(readFileSync(indexPath, 'utf-8')).pages || [];
+    const base = JSON.parse(readFileSync(indexPath, 'utf-8'));
+    const pages = base.pages || [];
+    const chunks = base.chunks || 0;
+    for (let i = 1; i <= chunks; i++) {
+      const chunkPath = join(WIKI_DIR, `_index-${i}.json`);
+      if (!existsSync(chunkPath)) break;
+      try {
+        const chunk = JSON.parse(readFileSync(chunkPath, 'utf-8'));
+        pages.push(...(chunk.pages || []));
+      } catch { /* skip bad chunk */ }
+    }
+    return pages;
   } catch {
     return [];
   }
@@ -232,6 +244,36 @@ function applyLocalLinks(content, links, wikiPages) {
   return result;
 }
 
+// Scan markdown for asset references (assets/<path>) and verify each
+// referenced file exists under <repo>/assets/. Returns an array of missing
+// paths; empty array means OK.
+function findMissingAssets(content) {
+  const missing = new Set();
+  const seen = new Set();
+  const patterns = [
+    /!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, // images
+    /(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, // links
+  ];
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(content)) !== null) {
+      const url = m[1].trim();
+      if (!/^\.?\/?assets\//.test(url)) continue;
+      if (/^https?:|^#|^mailto:/.test(url)) continue;
+      const rel = url.replace(/^\.\//, '').replace(/^\//, '');
+      if (seen.has(rel)) continue;
+      seen.add(rel);
+      const full = resolve(REPO_ROOT, rel);
+      if (!full.startsWith(ASSETS_DIR)) {
+        missing.add(rel);
+        continue;
+      }
+      if (!existsSync(full)) missing.add(rel);
+    }
+  }
+  return [...missing];
+}
+
 function applyWikipediaLinks(content, links) {
   let result = content;
 
@@ -305,6 +347,17 @@ if (command === 'generate-local-links') {
   const raw = readFileSync(draftFile, 'utf-8');
   const { meta, content } = parseFrontmatter(raw);
   const slug = basename(draftFile, '.md');
+
+  // Validate asset references before publishing.
+  const missingAssets = findMissingAssets(content);
+  if (missingAssets.length > 0) {
+    process.stderr.write(
+      `ERROR: ${slug} references missing assets:\n` +
+        missingAssets.map((p) => `  - ${p}`).join('\n') +
+        `\nAdd them under ${ASSETS_DIR}/ or fix the path, then republish.\n`
+    );
+    process.exit(1);
+  }
 
   if (!meta.title) meta.title = slugToTitle(slug);
   if (!meta.description) meta.description = '';

@@ -83,8 +83,22 @@ export async function fetchWikiIndex(): Promise<WikiIndex> {
 
   const res = await fetch(CONFIG.INDEX_URL);
   if (!res.ok) throw new Error(`Failed to fetch wiki index: ${res.status}`);
-  const data = await res.json();
-  indexCache = data as WikiIndex;
+  const base = (await res.json()) as WikiIndex & { chunks?: number };
+
+  const chunks = typeof base.chunks === 'number' ? base.chunks : 0;
+  if (chunks > 0) {
+    const urls = Array.from({ length: chunks }, (_, i) => CONFIG.getIndexChunkUrl(i + 1));
+    const results = await Promise.all(
+      urls.map(async (url) => {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`Failed to fetch index chunk ${url}: ${r.status}`);
+        return (await r.json()) as { pages: WikiIndex['pages'] };
+      })
+    );
+    for (const chunk of results) base.pages = base.pages.concat(chunk.pages || []);
+  }
+
+  indexCache = base;
   return indexCache;
 }
 
