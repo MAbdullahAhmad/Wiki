@@ -28,6 +28,7 @@ const REPO_ROOT = resolve(import.meta.dirname, '../..');
 const DRAFTS_DIR = resolve(REPO_ROOT, 'drafts');
 const WIKI_DIR = resolve(REPO_ROOT, 'wiki');
 const ASSETS_DIR = resolve(REPO_ROOT, 'assets');
+const AUTHORS_FILE = resolve(REPO_ROOT, 'authors.json');
 const PUBLISH_DIR = resolve(REPO_ROOT, '.publish');
 
 // ═══════════════════════════════════════════════════════════
@@ -94,6 +95,11 @@ function serializeFrontmatter(meta, content) {
   const lines = ['---'];
   if (meta.title) lines.push(`title: "${meta.title}"`);
   if (meta.description) lines.push(`description: "${meta.description}"`);
+  if (meta.author) lines.push(`author: ${meta.author}`);
+  if (Array.isArray(meta['co-authors']) && meta['co-authors'].length > 0) {
+    lines.push('co-authors:');
+    for (const u of meta['co-authors']) lines.push(`  - ${u}`);
+  }
 
   if (meta.tags && meta.tags.length > 0) {
     lines.push('tags:');
@@ -107,7 +113,7 @@ function serializeFrontmatter(meta, content) {
     for (const rel of meta.related) lines.push(`  - ${rel}`);
   }
   for (const [key, val] of Object.entries(meta)) {
-    if (['title', 'description', 'tags', 'related'].includes(key)) continue;
+    if (['title', 'description', 'tags', 'related', 'author', 'co-authors'].includes(key)) continue;
     if (typeof val === 'string') lines.push(`${key}: "${val}"`);
     else if (Array.isArray(val) && val.every((v) => typeof v === 'string')) {
       lines.push(`${key}:`);
@@ -117,6 +123,35 @@ function serializeFrontmatter(meta, content) {
   lines.push('---');
   lines.push('');
   return lines.join('\n') + content;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Author registry (authors.json)
+// ═══════════════════════════════════════════════════════════
+
+function loadAuthors() {
+  if (!existsSync(AUTHORS_FILE)) return {};
+  try { return JSON.parse(readFileSync(AUTHORS_FILE, 'utf-8')) || {}; }
+  catch { return {}; }
+}
+
+function saveAuthors(map) {
+  writeFileSync(AUTHORS_FILE, JSON.stringify(map, null, 2) + '\n', 'utf-8');
+}
+
+function collectAuthors(meta) {
+  const out = [];
+  if (typeof meta.author === 'string' && meta.author.trim()) out.push(meta.author.trim());
+  if (Array.isArray(meta['co-authors'])) {
+    for (const u of meta['co-authors']) if (typeof u === 'string' && u.trim()) out.push(u.trim());
+  }
+  return out;
+}
+
+function findMissingAuthors(meta) {
+  const known = loadAuthors();
+  const used = collectAuthors(meta);
+  return used.filter((u) => !known[u]);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -348,6 +383,18 @@ if (command === 'generate-local-links') {
   const { meta, content } = parseFrontmatter(raw);
   const slug = basename(draftFile, '.md');
 
+  // Validate authors before publishing (defensive — bash should have caught
+  // this, but this protects direct invocations of the helper).
+  const missingAuthors = findMissingAuthors(meta);
+  if (missingAuthors.length > 0) {
+    process.stderr.write(
+      `ERROR: ${slug} references unknown authors:\n` +
+        missingAuthors.map((u) => `  - ${u}`).join('\n') +
+        `\nRun ./publish.bash and follow the prompts to register them, or add to authors.json.\n`
+    );
+    process.exit(1);
+  }
+
   // Validate asset references before publishing.
   const missingAssets = findMissingAssets(content);
   if (missingAssets.length > 0) {
@@ -410,10 +457,37 @@ if (command === 'generate-local-links') {
   writeFileSync(join(WIKI_DIR, `${slug}.md`), output, 'utf-8');
   process.stdout.write(`PUBLISHED ${slug}\n`);
 
+} else if (command === 'check-authors') {
+  // Print MISSING:<username> lines for each author/co-author in the draft
+  // that isn't yet registered in authors.json. publish.bash reads these
+  // lines and prompts to create them.
+  const draftFile = resolve(process.argv[3]);
+  const raw = readFileSync(draftFile, 'utf-8');
+  const { meta } = parseFrontmatter(raw);
+  const missing = findMissingAuthors(meta);
+  for (const u of missing) process.stdout.write(`MISSING:${u}\n`);
+
+} else if (command === 'create-author') {
+  // Usage: create-author <username> <full name>
+  // Adds the author to authors.json (idempotent — overwrites name if username
+  // already exists).
+  const username = process.argv[3];
+  const name = process.argv.slice(4).join(' ').trim();
+  if (!username || !name) {
+    process.stderr.write('Usage: publish-helper.js create-author <username> <name>\n');
+    process.exit(1);
+  }
+  const authors = loadAuthors();
+  authors[username] = { ...(authors[username] || {}), name };
+  saveAuthors(authors);
+  process.stdout.write(`CREATED ${username}\n`);
+
 } else {
   process.stderr.write(
     'Usage:\n' +
     '  publish-helper.js generate-local-links <draft-file>\n' +
+    '  publish-helper.js check-authors <draft-file>\n' +
+    '  publish-helper.js create-author <username> <name>\n' +
     '  publish-helper.js publish <draft-file>\n'
   );
   process.exit(1);

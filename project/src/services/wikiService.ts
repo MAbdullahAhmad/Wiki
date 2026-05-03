@@ -139,6 +139,8 @@ export async function fetchWikiPage(slug: string): Promise<WikiPage> {
     description: (meta.description as string) || '',
     tags,
     related,
+    author: (meta.author as string) || undefined,
+    coAuthors: (meta['co-authors'] as string[]) || undefined,
     content,
     sections,
   };

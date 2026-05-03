@@ -9,6 +9,8 @@ export interface WikiPageMeta {
   description: string;
   tags: WikiTag[];
   related: string[];
+  author?: string;
+  coAuthors?: string[];
   excerpt?: string;
   sections?: string[];
   keywords?: string[];
@@ -24,9 +26,21 @@ export interface TaxonomyNode {
   [key: string]: TaxonomyNode | string[];
 }
 
+export interface AuthorLink {
+  url: string;
+  type?: string;
+  label?: string;
+}
+
+export interface Author {
+  name: string;
+  links?: AuthorLink[];
+}
+
 export interface WikiIndex {
   pages: WikiPageMeta[];
   taxonomy: TaxonomyNode;
+  authors?: Record<string, Author>;
 }
 
 export interface TagBreadcrumb {

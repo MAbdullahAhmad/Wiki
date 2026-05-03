@@ -158,6 +158,40 @@ for idx in "${SELECTED_INDICES[@]}"; do
     LOCAL_FILE="$PUBLISH_DIR/local-links.json"
     WIKI_FILE="$PUBLISH_DIR/wikipedia-links.json"
 
+    # Step 0: Verify authors exist; offer to create missing ones.
+    AUTHOR_ABORT=0
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        username="${line#MISSING:}"
+        echo ""
+        echo -e "  ${YELLOW}Warning:${NC} author ${BOLD}${username}${NC} is not registered."
+        read -rp "  Create author '${username}'? [Y/n] " confirm
+        confirm=${confirm:-Y}
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            read -rp "  Full name for '${username}': " full_name
+            if [[ -z "$full_name" ]]; then
+                echo -e "  ${RED}Skipped:${NC} no name provided."
+                AUTHOR_ABORT=1
+                continue
+            fi
+            CREATE_OUT=$(node "$HELPER" create-author "$username" "$full_name" 2>&1 || true)
+            if echo "$CREATE_OUT" | grep -q "^CREATED"; then
+                echo -e "  ${GREEN}Created:${NC} ${username} → ${full_name}"
+            else
+                echo -e "  ${RED}Failed to create author:${NC} $CREATE_OUT"
+                AUTHOR_ABORT=1
+            fi
+        else
+            echo -e "  ${YELLOW}Skipped${NC} — cannot publish until '${username}' is registered."
+            AUTHOR_ABORT=1
+        fi
+    done < <(node "$HELPER" check-authors "$file" 2>/dev/null || true)
+
+    if [[ "$AUTHOR_ABORT" -eq 1 ]]; then
+        echo -e "  ${RED}Aborting:${NC} unresolved author(s). Edit ${rel_path} or re-run."
+        continue
+    fi
+
     # Step 1a: Generate local link suggestions
     echo ""
     echo -e "  ${DIM}Scanning for local wiki links...${NC}"

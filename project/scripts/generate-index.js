@@ -12,6 +12,7 @@ import { existsSync } from 'fs';
 
 const WIKI_DIR = resolve(import.meta.dirname, '../../wiki');
 const DRAFTS_DIR = resolve(import.meta.dirname, '../../drafts');
+const AUTHORS_FILE = resolve(import.meta.dirname, '../../authors.json');
 const OUTPUT = join(WIKI_DIR, '_index.json');
 
 // Max bytes for any single index file (base or chunk). Pages are split greedily
@@ -244,6 +245,8 @@ async function main() {
       description: meta.description || '',
       tags: meta.tags || [],
       related: meta.related || [],
+      author: meta.author || '',
+      coAuthors: meta['co-authors'] || [],
       excerpt: extractExcerpt(body),
       sections: extractSections(body),
       keywords: extractKeywords(body, title),
@@ -254,6 +257,9 @@ async function main() {
   pages.sort((a, b) => a.title.localeCompare(b.title));
 
   const taxonomy = await buildTaxonomyFromDrafts();
+  const authors = existsSync(AUTHORS_FILE)
+    ? JSON.parse(await readFile(AUTHORS_FILE, 'utf-8'))
+    : {};
   const generatedAt = new Date().toISOString();
 
   // Remove any pre-existing rotated chunks so stale ones never linger.
@@ -269,13 +275,12 @@ async function main() {
   const slices = [];
   let current = [];
   let currentBytes = 0;
-  let isFirst = true;
 
   const overheadBytes = (firstChunk) =>
     Buffer.byteLength(
       JSON.stringify(
         firstChunk
-          ? { pages: [], taxonomy, generatedAt, chunks: 0 }
+          ? { pages: [], taxonomy, authors, generatedAt, chunks: 0 }
           : { pages: [] },
         null,
         2
@@ -291,7 +296,6 @@ async function main() {
       slices.push(current);
       current = [];
       currentBytes = 0;
-      isFirst = false;
       budget = CHUNK_BYTES - overheadBytes(false);
     }
     current.push(page);
@@ -303,6 +307,7 @@ async function main() {
   const base = {
     pages: slices[0] || [],
     taxonomy,
+    authors,
     generatedAt,
     chunks,
   };

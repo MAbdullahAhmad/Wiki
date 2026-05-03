@@ -28,6 +28,7 @@ npx vite build               # Production build
 - **Drafts**: `drafts/` organized as `<Domain>/<Subject>/<file>.md` (topics) or `<Domain>/<Subject>/<Topic>/<file>.md` (subtopics)
 - **Published wiki**: `wiki/*.md` flat directory with YAML frontmatter (title, description, tags, related)
 - **Assets**: `assets/` at repo root holds images and binaries; markdown references them as `assets/<path>`. Renderer rewrites to raw GitHub URL in prod; vite middleware serves them in dev. Publish step fails if any reference is missing.
+- **Authors**: `authors.json` at repo root maps `username → { name, links[] }`. Drafts use `author:` (single) and `co-authors:` (list) frontmatter fields. `./publish.bash` interactively prompts to create unknown usernames. Frontend `AuthorByline` resolves usernames to names and renders link icons (auto-detected per hostname).
 - **Publish tool**: `publish.bash` calls `project/scripts/publish-helper.js` for asset validation, link detection, frontmatter management, and tag derivation
 - **Index rotation**: `project/scripts/generate-index.js` writes `wiki/_index.json` (base, with taxonomy + first slice + `chunks: N`) plus `_index-1.json`, `_index-2.json`, … each capped at 10 MB. Both the frontend (`wikiService.ts`) and the publish helper (`loadWikiPages`) merge chunks transparently.
 - **React app**: `project/src/` (Vite + React + TypeScript + Tailwind)

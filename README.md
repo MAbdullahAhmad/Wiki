@@ -97,6 +97,44 @@ npm run deploy
 
 This builds, then force-pushes `dist/` to the `gh-pages` branch. The shell CWD never changes — deploy runs in a temp directory.
 
+## Authors
+
+`authors.json` at the repo root holds a username → metadata map. The minimum is just a `name`; you can also attach a list of `links`:
+
+```json
+{
+  "abdullah": {
+    "name": "Abdullah Ahmad",
+    "links": [
+      { "url": "https://github.com/MAbdullahAhmad" },
+      { "url": "https://linkedin.com/in/m-abdullah-ahmad" }
+    ]
+  }
+}
+```
+
+In a draft's frontmatter, reference authors by username:
+
+```yaml
+author: abdullah
+co-authors:
+  - someone
+  - another
+```
+
+When you run `./publish.bash`, any unknown username triggers an interactive prompt:
+
+```
+Warning: author 'someone' is not registered.
+Create author 'someone'? [Y/n] y
+Full name for 'someone': Some One
+Created: someone → Some One
+```
+
+If you decline, the publish for that file is aborted (other files in the batch still process). Author entries can be extended later with bios, avatars, etc. — the rest of the schema is open.
+
+The frontend renders a byline under the page title with each author's links as small icons. Common platforms (GitHub, LinkedIn, X/Twitter, Instagram, YouTube, Facebook, Upwork) auto-detect from the URL hostname; anything else gets a globe (website) or generic link icon.
+
 ## Page format
 
 ```markdown

@@ -11,6 +11,8 @@
         }
       ],
       "related": [],
+      "author": "abdullah",
+      "coAuthors": [],
       "excerpt": "This is your personal wiki.",
       "sections": [
         "Welcome"
@@ -24,6 +26,25 @@
   "taxonomy": {
     "Internal": {}
   },
-  "generatedAt": "2026-05-03T23:36:51.401Z",
+  "authors": {
+    "abdullah": {
+      "name": "Abdullah Ahmad",
+      "links": [
+        {
+          "url": "https://github.com/MAbdullahAhmad"
+        },
+        {
+          "url": "https://linkedin.com/in/m-abdullah-ahmad"
+        },
+        {
+          "url": "https://upwork.com/freelancers/abdullah123"
+        },
+        {
+          "url": "https://devabdullah.com"
+        }
+      ]
+    }
+  },
+  "generatedAt": "2026-05-03T23:41:42.216Z",
   "chunks": 0
 }

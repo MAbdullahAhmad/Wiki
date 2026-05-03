@@ -3,6 +3,7 @@ import { useWikiPage } from '@/hooks/useWikiPage';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { TagBadge } from './TagBadge';
 import { RelatedPages } from './RelatedPages';
+import { AuthorByline } from './AuthorByline';
 import { ArrowLeft, Loader2, AlertCircle, Clock, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -59,6 +60,8 @@ export function WikiPageView() {
             <TagBadge key={i} tag={tag} />
           ))}
         </div>
+
+        <AuthorByline author={page.author} coAuthors={page.coAuthors} />
 
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span className="flex items-center gap-1">
