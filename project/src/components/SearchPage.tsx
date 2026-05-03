@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -18,15 +18,23 @@ import { TAG_COLORS } from '@/types/wiki';
 
 export function SearchPage() {
   const navigate = useNavigate();
-  const { index, loading: indexLoading } = useWikiIndex();
+  const { index, loading: indexLoading } = useWikiIndex({ full: true });
   const [query, setQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | ''>('');
   const [filterTagType, setFilterTagType] = useState<WikiTag['type'] | ''>('');
   const [filteredData, setFilteredData] = useState<WikiPageMeta[]>([]);
+  const [debounced, setDebounced] = useState('');
+  const [visible, setVisible] = useState(60);
+
+  // Debounce typing so we don't re-filter on every keystroke at >1k pages.
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(query), 120);
+    return () => clearTimeout(id);
+  }, [query]);
 
   useEffect(() => {
     if (!index) return;
-    let results = searchPages(index.pages, query);
+    let results = searchPages(index.pages, debounced);
 
     if (filterTagType) {
       results = results.filter((p) => p.tags.some((t) => t.type === filterTagType));
@@ -39,7 +47,11 @@ export function SearchPage() {
     }
 
     setFilteredData(results);
-  }, [query, sortOrder, filterTagType, index]);
+    setVisible(60);
+  }, [debounced, sortOrder, filterTagType, index]);
+
+  const renderedData = useMemo(() => filteredData.slice(0, visible), [filteredData, visible]);
+  const hasMore = visible < filteredData.length;
 
   const tagTypes: WikiTag['type'][] = ['domain', 'subject', 'topic', 'subtopic'];
 
@@ -127,7 +139,7 @@ export function SearchPage() {
           {indexLoading ? (
             <div className="text-center py-12 text-muted-foreground">Loading wiki index...</div>
           ) : filteredData.length > 0 ? (
-            filteredData.map((item) => (
+            renderedData.map((item) => (
               <button
                 key={item.slug}
                 onClick={() => navigate(`/page/${item.slug}`)}
@@ -144,7 +156,17 @@ export function SearchPage() {
                 </div>
               </button>
             ))
-          ) : (
+          ) : null}
+
+          {hasMore && (
+            <div className="text-center pt-2">
+              <Button variant="outline" onClick={() => setVisible((v) => v + 60)}>
+                Load more ({filteredData.length - visible} remaining)
+              </Button>
+            </div>
+          )}
+
+          {!indexLoading && filteredData.length === 0 && (
             <div className="text-center py-12">
               <Search className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
               <p className="text-muted-foreground">

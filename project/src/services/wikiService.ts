@@ -3,6 +3,9 @@ import type { WikiIndex, WikiPage, WikiPageMeta, WikiTag, TagBreadcrumb, Taxonom
 
 const pageCache = new Map<string, WikiPage>();
 let indexCache: WikiIndex | null = null;
+let baseChunkCount = 0;
+let chunksLoaded = false;
+let chunksPromise: Promise<void> | null = null;
 
 function parseFrontmatter(raw: string): { meta: Record<string, unknown>; content: string } {
   const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
@@ -78,28 +81,43 @@ function extractSections(content: string): string[] {
   return sections;
 }
 
+// Fetch the base index (taxonomy + first slice of pages). Cheap — one HTTP
+// round trip, capped at 10 MB by the writer. Sufficient for the home page,
+// which only needs taxonomy + a handful of recent pages.
 export async function fetchWikiIndex(): Promise<WikiIndex> {
   if (indexCache) return indexCache;
 
   const res = await fetch(CONFIG.INDEX_URL);
   if (!res.ok) throw new Error(`Failed to fetch wiki index: ${res.status}`);
   const base = (await res.json()) as WikiIndex & { chunks?: number };
-
-  const chunks = typeof base.chunks === 'number' ? base.chunks : 0;
-  if (chunks > 0) {
-    const urls = Array.from({ length: chunks }, (_, i) => CONFIG.getIndexChunkUrl(i + 1));
-    const results = await Promise.all(
-      urls.map(async (url) => {
-        const r = await fetch(url);
-        if (!r.ok) throw new Error(`Failed to fetch index chunk ${url}: ${r.status}`);
-        return (await r.json()) as { pages: WikiIndex['pages'] };
-      })
-    );
-    for (const chunk of results) base.pages = base.pages.concat(chunk.pages || []);
-  }
-
+  baseChunkCount = typeof base.chunks === 'number' ? base.chunks : 0;
+  chunksLoaded = baseChunkCount === 0;
   indexCache = base;
   return indexCache;
+}
+
+// Ensure all rotated index chunks are fetched and merged. Called by routes
+// that need to filter or browse the entire corpus (search, browse, tag view).
+// Idempotent; concurrent callers share the same in-flight fetch.
+export async function ensureFullIndex(): Promise<WikiIndex> {
+  const base = await fetchWikiIndex();
+  if (chunksLoaded) return base;
+  if (!chunksPromise) {
+    chunksPromise = (async () => {
+      const urls = Array.from({ length: baseChunkCount }, (_, i) => CONFIG.getIndexChunkUrl(i + 1));
+      const results = await Promise.all(
+        urls.map(async (url) => {
+          const r = await fetch(url);
+          if (!r.ok) throw new Error(`Failed to fetch index chunk ${url}: ${r.status}`);
+          return (await r.json()) as { pages: WikiIndex['pages'] };
+        })
+      );
+      for (const chunk of results) base.pages = base.pages.concat(chunk.pages || []);
+      chunksLoaded = true;
+    })();
+  }
+  await chunksPromise;
+  return base;
 }
 
 export async function fetchWikiPage(slug: string): Promise<WikiPage> {
@@ -132,6 +150,9 @@ export async function fetchWikiPage(slug: string): Promise<WikiPage> {
 export function clearCache() {
   pageCache.clear();
   indexCache = null;
+  baseChunkCount = 0;
+  chunksLoaded = false;
+  chunksPromise = null;
 }
 
 export function findBreadcrumb(taxonomy: TaxonomyNode, tagName: string): TagBreadcrumb | null {

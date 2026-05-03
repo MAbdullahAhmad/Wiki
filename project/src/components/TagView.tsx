@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 export function TagView() {
   const { tagName } = useParams<{ tagName: string }>();
   const navigate = useNavigate();
-  const { index, loading } = useWikiIndex();
+  const { index, loading } = useWikiIndex({ full: true });
 
   if (loading) {
     return (

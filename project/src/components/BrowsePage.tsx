@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useWikiIndex } from '@/hooks/useWikiIndex';
 import { TagBadge } from './TagBadge';
 import { LinkPreview } from './LinkPreview';
@@ -7,16 +7,25 @@ import { Button } from '@/components/ui/button';
 import type { WikiTag } from '@/types/wiki';
 import { TAG_COLORS } from '@/types/wiki';
 
+const PAGE_SIZE = 60;
+
 export function BrowsePage() {
-  const { index, loading } = useWikiIndex();
+  const { index, loading } = useWikiIndex({ full: true });
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [activeFilter, setActiveFilter] = useState<WikiTag['type'] | ''>('');
+  const [visible, setVisible] = useState(PAGE_SIZE);
 
   const filteredPages = useMemo(() => {
     if (!index) return [];
     if (!activeFilter) return index.pages;
     return index.pages.filter((p) => p.tags.some((t) => t.type === activeFilter));
   }, [index, activeFilter]);
+
+  // Reset visible window when the filter changes.
+  useEffect(() => { setVisible(PAGE_SIZE); }, [activeFilter]);
+
+  const renderedPages = filteredPages.slice(0, visible);
+  const hasMore = visible < filteredPages.length;
 
   if (loading) {
     return (
@@ -77,7 +86,7 @@ export function BrowsePage() {
 
       {view === 'grid' ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredPages.map((page) => (
+          {renderedPages.map((page) => (
             <div
               key={page.slug}
               className="p-4 rounded-lg border border-border bg-card hover:shadow-md hover:border-primary/30 transition-all"
@@ -98,7 +107,7 @@ export function BrowsePage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredPages.map((page) => (
+          {renderedPages.map((page) => (
             <div
               key={page.slug}
               className="flex items-center gap-4 p-3 rounded-lg border border-border bg-card hover:shadow-sm hover:border-primary/30 transition-all"
@@ -118,6 +127,14 @@ export function BrowsePage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {hasMore && (
+        <div className="text-center mt-6">
+          <Button variant="outline" onClick={() => setVisible((v) => v + PAGE_SIZE)}>
+            Load more ({filteredPages.length - visible} remaining)
+          </Button>
         </div>
       )}
     </div>
