@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Search, BookOpen, Home, Menu, X, Moon, Sun } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,6 +13,42 @@ function getInitialTheme(): 'light' | 'dark' {
   const stored = localStorage.getItem('wiki-theme');
   if (stored === 'dark' || stored === 'light') return stored;
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function ThemeSwitch({ theme, onToggle }: { theme: 'light' | 'dark'; onToggle: () => void }) {
+  const id = useId();
+  const isDark = theme === 'dark';
+
+  return (
+    <div
+      className="group inline-flex items-center gap-2"
+      data-state={isDark ? 'checked' : 'unchecked'}
+    >
+      <span
+        id={`${id}-light`}
+        className="group-data-[state=checked]:text-muted-foreground/70 cursor-pointer text-sm font-medium"
+        aria-controls={id}
+        onClick={() => isDark && onToggle()}
+      >
+        <Sun className="size-4" aria-hidden="true" />
+      </span>
+      <Switch
+        id={id}
+        checked={isDark}
+        onCheckedChange={onToggle}
+        aria-labelledby={`${id}-dark ${id}-light`}
+        aria-label="Toggle between dark and light mode"
+      />
+      <span
+        id={`${id}-dark`}
+        className="group-data-[state=unchecked]:text-muted-foreground/70 cursor-pointer text-sm font-medium"
+        aria-controls={id}
+        onClick={() => !isDark && onToggle()}
+      >
+        <Moon className="size-4" aria-hidden="true" />
+      </span>
+    </div>
+  );
 }
 
 export function Layout({ children }: LayoutProps) {
@@ -58,16 +95,12 @@ export function Layout({ children }: LayoutProps) {
                 </Link>
               ))}
             </nav>
-            <div className="w-px h-6 bg-border mx-1" />
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8">
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
+            <div className="w-px h-6 bg-border mx-2" />
+            <ThemeSwitch theme={theme} onToggle={toggleTheme} />
           </div>
 
-          <div className="flex items-center gap-1 sm:hidden">
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8">
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
+          <div className="flex items-center gap-2 sm:hidden">
+            <ThemeSwitch theme={theme} onToggle={toggleTheme} />
             <Button
               variant="ghost"
               size="icon"
