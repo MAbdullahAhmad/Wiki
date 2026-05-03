@@ -1,0 +1,5 @@
+/_notes
+/project/node_modules
+/project/dist
+.deploy-temp
+.DS_Store

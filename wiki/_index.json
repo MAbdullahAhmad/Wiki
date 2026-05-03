@@ -1,0 +1,283 @@
+{
+  "pages": [
+    {
+      "slug": "algorithms",
+      "title": "Algorithms",
+      "description": "Step-by-step procedures for solving computational problems",
+      "tags": [],
+      "related": [
+        {
+          "type": "topic",
+          "name": "Algorithms"
+        },
+        "data-structures",
+        "python-programming"
+      ]
+    },
+    {
+      "slug": "artificial-intelligence",
+      "title": "Artificial Intelligence",
+      "description": "The simulation of human intelligence processes by computer systems",
+      "tags": [],
+      "related": [
+        {
+          "type": "topic",
+          "name": "Artificial Intelligence"
+        },
+        "machine-learning",
+        "deep-learning",
+        "natural-language-processing",
+        "python-programming"
+      ]
+    },
+    {
+      "slug": "backend-development",
+      "title": "Backend Development",
+      "description": "Server-side logic, databases, and APIs that power web applications",
+      "tags": [],
+      "related": [
+        {
+          "type": "subtopic",
+          "name": "Backend Development"
+        },
+        "web-development",
+        "frontend-development",
+        "python-programming"
+      ]
+    },
+    {
+      "slug": "calculus",
+      "title": "Calculus",
+      "description": "The mathematical study of continuous change",
+      "tags": [],
+      "related": [
+        {
+          "type": "topic",
+          "name": "Calculus"
+        },
+        "linear-algebra",
+        "statistics",
+        "classical-mechanics"
+      ]
+    },
+    {
+      "slug": "classical-mechanics",
+      "title": "Classical Mechanics",
+      "description": "The study of motion of macroscopic objects under forces",
+      "tags": [],
+      "related": [
+        {
+          "type": "topic",
+          "name": "Classical Mechanics"
+        },
+        "quantum-mechanics",
+        "calculus",
+        "linear-algebra"
+      ]
+    },
+    {
+      "slug": "data-structures",
+      "title": "Data Structures",
+      "description": "Specialized formats for organizing and storing data",
+      "tags": [],
+      "related": [
+        {
+          "type": "topic",
+          "name": "Data Structures"
+        },
+        "algorithms",
+        "python-programming"
+      ]
+    },
+    {
+      "slug": "deep-learning",
+      "title": "Deep Learning",
+      "description": "A subset of machine learning using neural networks with many layers",
+      "tags": [],
+      "related": [
+        {
+          "type": "subtopic",
+          "name": "Deep Learning"
+        },
+        "machine-learning",
+        "artificial-intelligence",
+        "natural-language-processing",
+        "linear-algebra"
+      ]
+    },
+    {
+      "slug": "frontend-development",
+      "title": "Frontend Development",
+      "description": "Building the user interface and experience of web applications",
+      "tags": [],
+      "related": [
+        {
+          "type": "subtopic",
+          "name": "Frontend Development"
+        },
+        "web-development",
+        "backend-development"
+      ]
+    },
+    {
+      "slug": "linear-algebra",
+      "title": "Linear Algebra",
+      "description": "The branch of mathematics dealing with vectors, matrices, and linear transformations",
+      "tags": [],
+      "related": [
+        {
+          "type": "topic",
+          "name": "Linear Algebra"
+        },
+        "calculus",
+        "machine-learning",
+        "deep-learning",
+        "quantum-mechanics",
+        "statistics"
+      ]
+    },
+    {
+      "slug": "machine-learning",
+      "title": "Machine Learning",
+      "description": "A subset of AI that enables systems to learn from data",
+      "tags": [],
+      "related": [
+        {
+          "type": "subtopic",
+          "name": "Machine Learning"
+        },
+        "artificial-intelligence",
+        "deep-learning",
+        "statistics",
+        "python-programming",
+        "linear-algebra"
+      ]
+    },
+    {
+      "slug": "natural-language-processing",
+      "title": "Natural Language Processing",
+      "description": "The ability of computers to understand and generate human language",
+      "tags": [],
+      "related": [
+        {
+          "type": "subtopic",
+          "name": "Natural Language Processing"
+        },
+        "artificial-intelligence",
+        "deep-learning",
+        "machine-learning"
+      ]
+    },
+    {
+      "slug": "python-programming",
+      "title": "Python Programming",
+      "description": "A high-level, interpreted programming language known for its simplicity",
+      "tags": [],
+      "related": [
+        {
+          "type": "topic",
+          "name": "Python Programming"
+        },
+        "machine-learning",
+        "algorithms",
+        "data-structures",
+        "web-development"
+      ]
+    },
+    {
+      "slug": "quantum-computing",
+      "title": "Quantum Computing",
+      "description": "Computing using quantum mechanical phenomena like superposition",
+      "tags": [],
+      "related": [
+        {
+          "type": "subtopic",
+          "name": "Quantum Computing"
+        },
+        "quantum-mechanics",
+        "algorithms",
+        "linear-algebra"
+      ]
+    },
+    {
+      "slug": "quantum-mechanics",
+      "title": "Quantum Mechanics",
+      "description": "The branch of physics dealing with the behavior of matter at atomic scales",
+      "tags": [],
+      "related": [
+        {
+          "type": "topic",
+          "name": "Quantum Mechanics"
+        },
+        "classical-mechanics",
+        "quantum-computing",
+        "linear-algebra"
+      ]
+    },
+    {
+      "slug": "statistics",
+      "title": "Statistics",
+      "description": "The science of collecting, analyzing, and interpreting data",
+      "tags": [],
+      "related": [
+        {
+          "type": "topic",
+          "name": "Statistics"
+        },
+        "machine-learning",
+        "calculus",
+        "linear-algebra"
+      ]
+    },
+    {
+      "slug": "web-development",
+      "title": "Web Development",
+      "description": "The process of building and maintaining websites and web applications",
+      "tags": [],
+      "related": [
+        {
+          "type": "topic",
+          "name": "Web Development"
+        },
+        "frontend-development",
+        "backend-development",
+        "python-programming"
+      ]
+    }
+  ],
+  "taxonomy": {
+    "Technology": {
+      "Computer Science": {
+        "Artificial Intelligence": [
+          "Machine Learning",
+          "Deep Learning",
+          "Natural Language Processing"
+        ],
+        "Data Structures": [],
+        "Algorithms": [],
+        "Python Programming": [],
+        "Web Development": [
+          "Frontend Development",
+          "Backend Development"
+        ]
+      },
+      "Electronics": {
+        "Digital Electronics": []
+      }
+    },
+    "Science": {
+      "Physics": {
+        "Quantum Mechanics": [
+          "Quantum Computing"
+        ],
+        "Classical Mechanics": []
+      },
+      "Mathematics": {
+        "Linear Algebra": [],
+        "Calculus": [],
+        "Statistics": []
+      }
+    }
+  },
+  "generatedAt": "2026-05-03T22:10:58.864Z"
+}
