@@ -9,6 +9,10 @@ export interface WikiPageMeta {
   description: string;
   tags: WikiTag[];
   related: string[];
+  excerpt?: string;
+  sections?: string[];
+  keywords?: string[];
+  wordCount?: number;
 }
 
 export interface WikiPage extends WikiPageMeta {

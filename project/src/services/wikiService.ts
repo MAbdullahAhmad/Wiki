@@ -147,6 +147,8 @@ export function searchPages(pages: WikiPageMeta[], query: string): WikiPageMeta[
     (p) =>
       p.title.toLowerCase().includes(q) ||
       p.description.toLowerCase().includes(q) ||
-      p.tags.some((t) => t.name.toLowerCase().includes(q))
+      p.tags.some((t) => t.name.toLowerCase().includes(q)) ||
+      (p.excerpt && p.excerpt.toLowerCase().includes(q)) ||
+      (p.keywords && p.keywords.some((k) => k.toLowerCase().includes(q)))
   );
 }

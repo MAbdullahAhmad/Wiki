@@ -2,17 +2,20 @@
 
 /**
  * Generates wiki/_index.json from all markdown files in the wiki/ directory.
- * Parses frontmatter from each .md file and builds a searchable index with taxonomy.
+ * Parses frontmatter from each .md file and builds a searchable index.
+ * Auto-builds the taxonomy from the drafts/ directory structure.
  */
 
-import { readdir, readFile, writeFile } from 'fs/promises';
-import { join, resolve } from 'path';
+import { readdir, readFile, writeFile, stat } from 'fs/promises';
+import { join, resolve, basename } from 'path';
+import { existsSync } from 'fs';
 
 const WIKI_DIR = resolve(import.meta.dirname, '../../wiki');
+const DRAFTS_DIR = resolve(import.meta.dirname, '../../drafts');
 const OUTPUT = join(WIKI_DIR, '_index.json');
 
-// Define the taxonomy hierarchy: Domain > Subject > Topic > Sub-topic
-const TAXONOMY = {
+// Fallback taxonomy (used when drafts/ doesn't exist)
+const FALLBACK_TAXONOMY = {
   Technology: {
     'Computer Science': {
       'Artificial Intelligence': ['Machine Learning', 'Deep Learning', 'Natural Language Processing'],
@@ -20,9 +23,6 @@ const TAXONOMY = {
       'Algorithms': [],
       'Python Programming': [],
       'Web Development': ['Frontend Development', 'Backend Development'],
-    },
-    'Electronics': {
-      'Digital Electronics': [],
     },
   },
   Science: {
@@ -39,7 +39,7 @@ const TAXONOMY = {
 };
 
 function parseFrontmatter(content) {
-  const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (!match) return { meta: {}, body: content };
 
   const yamlStr = match[1];
@@ -55,16 +55,16 @@ function parseFrontmatter(content) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    if (!line.startsWith(' ') && !line.startsWith('-')) {
-      if (currentList && currentKey) {
-        meta[currentKey] = currentList;
-        currentList = null;
-      }
+    if (!line.startsWith(' ') && !line.startsWith('\t') && !line.startsWith('-')) {
       if (inTagItem && Object.keys(tagObj).length > 0) {
         if (!currentList) currentList = [];
         currentList.push({ ...tagObj });
         tagObj = {};
         inTagItem = false;
+      }
+      if (currentList && currentKey) {
+        meta[currentKey] = currentList;
+        currentList = null;
       }
       const colonIdx = trimmed.indexOf(':');
       if (colonIdx > 0) {
@@ -102,6 +102,125 @@ function parseFrontmatter(content) {
   return { meta, body };
 }
 
+function slugToTitle(slug) {
+  return slug
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+function extractExcerpt(body) {
+  const lines = body.split('\n');
+  const paragraphs = [];
+  let current = '';
+  for (const line of lines) {
+    if (line.startsWith('#') || line.startsWith('```') || line.startsWith('|')) continue;
+    const trimmed = line.trim();
+    if (trimmed === '') {
+      if (current) {
+        paragraphs.push(current.trim());
+        current = '';
+      }
+    } else {
+      current += ' ' + trimmed;
+    }
+  }
+  if (current) paragraphs.push(current.trim());
+  return (paragraphs[0] || '').slice(0, 300);
+}
+
+function extractSections(body) {
+  const sections = [];
+  for (const line of body.split('\n')) {
+    const match = line.match(/^#{1,3}\s+(.+)/);
+    if (match) sections.push(match[1].trim());
+  }
+  return sections;
+}
+
+function extractKeywords(body, title) {
+  const keywords = new Set();
+  // Add words from bold text
+  const boldRegex = /\*\*([^*]+)\*\*/g;
+  let m;
+  while ((m = boldRegex.exec(body)) !== null) {
+    keywords.add(m[1].trim());
+  }
+  // Add section headings
+  for (const line of body.split('\n')) {
+    const match = line.match(/^#{1,4}\s+(.+)/);
+    if (match) keywords.add(match[1].trim());
+  }
+  // Add title words
+  for (const word of title.split(/\s+/)) {
+    if (word.length > 3) keywords.add(word);
+  }
+  return [...keywords].slice(0, 30);
+}
+
+/**
+ * Scans the drafts/ directory structure and builds a taxonomy tree.
+ * Structure: drafts/<Domain>/<Subject>/<Topic-dir>/ contains subtopic files
+ * Files at drafts/<Domain>/<Subject>/*.md are topics.
+ */
+async function buildTaxonomyFromDrafts() {
+  if (!existsSync(DRAFTS_DIR)) return FALLBACK_TAXONOMY;
+
+  const taxonomy = {};
+
+  async function readDirSafe(dir) {
+    try {
+      return await readdir(dir);
+    } catch {
+      return [];
+    }
+  }
+
+  // Level 1: Domains
+  const domains = await readDirSafe(DRAFTS_DIR);
+  for (const domain of domains) {
+    const domainPath = join(DRAFTS_DIR, domain);
+    const domainStat = await stat(domainPath).catch(() => null);
+    if (!domainStat?.isDirectory()) continue;
+
+    taxonomy[domain] = {};
+
+    // Level 2: Subjects
+    const subjects = await readDirSafe(domainPath);
+    for (const subject of subjects) {
+      const subjectPath = join(domainPath, subject);
+      const subjectStat = await stat(subjectPath).catch(() => null);
+      if (!subjectStat?.isDirectory()) continue;
+
+      taxonomy[domain][subject] = {};
+
+      // Level 3: items are either topic files or topic directories
+      const items = await readDirSafe(subjectPath);
+      for (const item of items) {
+        const itemPath = join(subjectPath, item);
+        const itemStat = await stat(itemPath).catch(() => null);
+
+        if (itemStat?.isDirectory()) {
+          // This is a topic directory; files inside are subtopics
+          const subtopicFiles = await readDirSafe(itemPath);
+          const subtopics = subtopicFiles
+            .filter((f) => f.endsWith('.md'))
+            .map((f) => slugToTitle(basename(f, '.md')));
+          taxonomy[domain][subject][item] = subtopics;
+        } else if (item.endsWith('.md')) {
+          // This is a topic file
+          const topicName = slugToTitle(basename(item, '.md'));
+          if (!taxonomy[domain][subject][topicName]) {
+            taxonomy[domain][subject][topicName] = [];
+          }
+        }
+      }
+    }
+  }
+
+  return taxonomy;
+}
+
 async function main() {
   const files = await readdir(WIKI_DIR);
   const mdFiles = files.filter((f) => f.endsWith('.md') && !f.startsWith('_'));
@@ -111,22 +230,29 @@ async function main() {
   for (const file of mdFiles) {
     const slug = file.replace(/\.md$/, '');
     const content = await readFile(join(WIKI_DIR, file), 'utf-8');
-    const { meta } = parseFrontmatter(content);
+    const { meta, body } = parseFrontmatter(content);
+    const title = meta.title || slugToTitle(slug);
 
     pages.push({
       slug,
-      title: meta.title || slug,
+      title,
       description: meta.description || '',
       tags: meta.tags || [],
       related: meta.related || [],
+      excerpt: extractExcerpt(body),
+      sections: extractSections(body),
+      keywords: extractKeywords(body, title),
+      wordCount: body.split(/\s+/).filter(Boolean).length,
     });
   }
 
   pages.sort((a, b) => a.title.localeCompare(b.title));
 
+  const taxonomy = await buildTaxonomyFromDrafts();
+
   const index = {
     pages,
-    taxonomy: TAXONOMY,
+    taxonomy,
     generatedAt: new Date().toISOString(),
   };
 
