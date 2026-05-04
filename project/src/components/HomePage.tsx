@@ -40,7 +40,7 @@ export function HomePage() {
             Wiki by Abdullah
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            An collaborative encyclopedia style place for defining meaningful topics.
+            A collaborative encyclopedia style place for defining meaningful topics.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button size="lg" onClick={() => navigate('/search')} className="gap-2">
