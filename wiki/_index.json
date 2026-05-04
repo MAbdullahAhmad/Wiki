@@ -1,0 +1,50 @@
+{
+  "pages": [
+    {
+      "slug": "welcome",
+      "title": "Welcome",
+      "description": "",
+      "tags": [
+        {
+          "type": "domain",
+          "name": "Internal"
+        }
+      ],
+      "related": [],
+      "author": "abdullah",
+      "coAuthors": [],
+      "excerpt": "This is your personal wiki.",
+      "sections": [
+        "Welcome"
+      ],
+      "keywords": [
+        "Welcome"
+      ],
+      "wordCount": 7
+    }
+  ],
+  "taxonomy": {
+    "Internal": {}
+  },
+  "authors": {
+    "abdullah": {
+      "name": "Abdullah Ahmad",
+      "links": [
+        {
+          "url": "https://github.com/MAbdullahAhmad"
+        },
+        {
+          "url": "https://linkedin.com/in/m-abdullah-ahmad"
+        },
+        {
+          "url": "https://upwork.com/freelancers/abdullah123"
+        },
+        {
+          "url": "https://devabdullah.com"
+        }
+      ]
+    }
+  },
+  "generatedAt": "2026-05-04T08:23:21.415Z",
+  "chunks": 0
+}

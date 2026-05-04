@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wiki by Abdullah</title>
+    <meta name="description" content="Wiki by Abdullah — a personal markdown-based wiki" />
+    <script>
+      // Pair with public/404.html: if a 404 stashed a route, restore it as
+      // a hash route before React mounts so HashRouter picks it up.
+      (function () {
+        try {
+          var pathKey = '__spa_redirect_path__';
+          var redirectKey = '__spa_redirect_in_flight__';
+          var stashed = sessionStorage.getItem(pathKey);
+          if (stashed) {
+            sessionStorage.removeItem(pathKey);
+            sessionStorage.removeItem(redirectKey);
+            window.location.hash = '#' + stashed;
+          }
+        } catch (e) { /* ignore */ }
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-CMe_Oe4x.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DWl_xoVy.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Wiki by Abdullah — Redirecting</title>
+    <script>
+      // SPA fallback for GitHub Pages.
+      //
+      // Strategy: stash the original requested path in sessionStorage and
+      // redirect to the app's base index.html *exactly once* per navigation.
+      // index.html reads the stash and applies it as a hash route. This
+      // avoids the previous infinite-reload bug where the 404 page was
+      // sometimes served at the base path itself and the script kept
+      // redirecting back to that same path.
+      (function () {
+        var loc = window.location;
+        var path = loc.pathname || '/';
+        // Determine app base: first path segment under the host (e.g. /Wiki/).
+        // For root-served sites this is just /.
+        var firstSeg = path.split('/').filter(Boolean)[0];
+        var base = firstSeg ? '/' + firstSeg + '/' : '/';
+        var redirectKey = '__spa_redirect_in_flight__';
+        var pathKey = '__spa_redirect_path__';
+
+        // If we just redirected, don't redirect again — the app failed to
+        // load for some other reason and looping won't help.
+        try {
+          if (sessionStorage.getItem(redirectKey)) {
+            sessionStorage.removeItem(redirectKey);
+            sessionStorage.removeItem(pathKey);
+            document.body && (document.body.innerText = 'Page not found.');
+            return;
+          }
+        } catch (e) { /* sessionStorage may be unavailable */ }
+
+        // Build the route to restore. Strip the base off of the original path.
+        var rest = path.indexOf(base) === 0 ? path.slice(base.length) : path.replace(/^\/+/, '');
+        rest = rest.replace(/\/+$/, '');
+        var route = rest ? '/' + rest : '';
+
+        // If we're already at the base with no extra path and no hash,
+        // don't redirect — there's nothing to recover and looping would
+        // just re-hit this page.
+        if (!route && !loc.hash && !loc.search) {
+          document.body && (document.body.innerText = 'Page not found.');
+          return;
+        }
+
+        try {
+          sessionStorage.setItem(redirectKey, '1');
+          if (route || loc.search) {
+            sessionStorage.setItem(pathKey, route + (loc.search || ''));
+          }
+        } catch (e) { /* ignore */ }
+
+        loc.replace(base);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
