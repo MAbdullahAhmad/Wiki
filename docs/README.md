@@ -4,6 +4,7 @@ Deeper docs for the Wiki project. The top-level [README](../README.md) and [AGEN
 
 ## Contents
 
+- [The idea](idea.md) — why we built this
 - [Getting started](getting-started.md) — install, run dev server, publish your first page
 - [Authoring](authoring.md) — draft layout, frontmatter schema, tag derivation
 - [Authors](authors.md) — `authors.json` schema, byline rendering, author pages
