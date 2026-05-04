@@ -21,6 +21,8 @@ import { tmpdir } from 'os';
 const ROOT = resolve(import.meta.dirname, '../..');
 const PROJECT = resolve(ROOT, 'project');
 const DIST = resolve(PROJECT, 'dist');
+const WIKI = resolve(ROOT, 'wiki');
+const ASSETS = resolve(ROOT, 'assets');
 
 function run(cmd, opts = {}) {
   console.log(`> ${cmd}`);
@@ -51,6 +53,11 @@ async function main() {
     // Copy build output
     cpSync(DIST, tempDir, { recursive: true });
     writeFileSync(join(tempDir, '.nojekyll'), '');
+
+    // Bundle content (wiki/ + assets/) so the deployed site is self-
+    // contained and never depends on main being merged.
+    if (existsSync(WIKI)) cpSync(WIKI, join(tempDir, 'wiki'), { recursive: true });
+    if (existsSync(ASSETS)) cpSync(ASSETS, join(tempDir, 'assets'), { recursive: true });
 
     // Get the remote URL
     const remote = runCapture('git remote get-url origin');
