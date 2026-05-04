@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/MAbdullahAhmad/Wiki/tree/main/docs
+    about: Most "how do I…?" questions are answered in docs/.
+  - name: Security report
+    url: https://github.com/MAbdullahAhmad/Wiki/security/advisories/new
+    about: Found a security issue? Report it privately here, not as a public issue.
