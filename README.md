@@ -1,105 +1,75 @@
-# Wiki — Personal Knowledge Base
+# Wiki
 
-A markdown-based personal wiki built with React, TypeScript, and Tailwind CSS. Content lives on `main`, the built site is force-pushed to `gh-pages` and served by GitHub Pages.
+A markdown wiki served from GitHub Pages. Source on `main`, built site on `gh-pages`.
 
 **Live:** [mabdullahahmad.github.io/Wiki/](https://mabdullahahmad.github.io/Wiki/)
 
-The canonical URL is case-sensitive (`/Wiki/`, not `/wiki/`). GitHub user-pages routing is owned by the `mabdullahahmad.github.io` repo, so the lowercase variant cannot be redirected from this repo alone.
-
-## Features
-
-- Markdown content with YAML frontmatter
-- Hierarchical tags (Domain → Subject → Topic → Sub-topic), color-coded
-- Full-screen search across titles, descriptions, tags, excerpts, keywords
-- Hover link previews for in-wiki links
-- Wikipedia link detection in published markdown
-- Image and asset support via `assets/` directory
-- Index rotation: index file is auto-split into ≤ 10 MB chunks as it grows
-- Interactive publish CLI with link suggestions and asset validation
-- SPA-safe 404 handler for GitHub Pages
-
-## Repository structure
+## Layout
 
 ```
-Wiki/
-├── drafts/                    # Source — organize by hierarchy
-│   └── <Domain>/<Subject>/[<Topic>/]<file>.md
-├── wiki/                      # Published — flat
-│   ├── _index.json            # Base index (taxonomy + first chunk of pages)
-│   ├── _index-1.json          # Rotated chunk (only if pages spill over 10 MB)
-│   ├── _index-2.json          # …
-│   └── *.md                   # Published markdown
-├── assets/                    # Images and binaries referenced by markdown
-├── project/                   # React app (Vite + TS + Tailwind)
-│   ├── src/
-│   ├── scripts/
-│   │   ├── generate-index.js  # Builds _index.json (+ rotated chunks)
-│   │   ├── publish-helper.js  # Backend for publish.bash
-│   │   └── deploy.js          # Force-pushes built dist/ to `gh-pages` branch
-│   └── package.json
-├── publish.bash               # Interactive publish tool
-└── README.md
+drafts/      # Source — organize by directory hierarchy
+wiki/        # Published markdown + _index.json (regenerated)
+assets/      # Images and other binaries referenced by markdown
+authors.json # Username → { name, links }
+project/     # Vite + React + TypeScript app
+publish.bash # Interactive publish tool
 ```
 
-## Workflow
+## Add a page
 
-### 1. Create a draft
+1. **Draft.** Drop a markdown file under `drafts/`. The path becomes the tags:
 
-Place a markdown file under `drafts/`:
+   ```
+   drafts/<Domain>/<Subject>/<slug>.md           → topic
+   drafts/<Domain>/<Subject>/<Topic>/<slug>.md   → subtopic
+   ```
 
-```
-drafts/<Domain>/<Subject>/<file>.md           → tagged as topic
-drafts/<Domain>/<Subject>/<Topic>/<file>.md   → tagged as subtopic
-```
+2. **Frontmatter.** Title is required. Author and co-authors reference usernames in `authors.json`.
 
-Tags are derived from the directory path; the filename becomes the slug. The taxonomy shown on the home page is built directly from the `drafts/` directory tree.
+   ```yaml
+   ---
+   title: "Machine Learning"
+   description: "A subset of AI that learns from data"
+   author: abdullah
+   co-authors:
+     - jane
+   related:
+     - artificial-intelligence
+   ---
+   ```
 
-### 2. Add assets (optional)
+3. **Publish.**
 
-Drop images and any other files into `assets/` at the repo root. Reference them from markdown by **relative path**:
+   ```bash
+   ./publish.bash               # interactive picker
+   ./publish.bash --all         # everything
+   ./publish.bash <file>.md     # one file
+   ```
+
+   The tool detects mentions of existing pages and Wikipedia terms and lets you opt in to linking each. Unknown authors prompt you to register them inline. Missing `assets/*` references abort the publish.
+
+4. **Deploy.**
+
+   ```bash
+   cd project && npm run deploy
+   ```
+
+   Builds, bundles `wiki/` and `assets/` with the dist, and force-pushes to `gh-pages`.
+
+## Assets
+
+Drop files into `assets/` and reference them by relative path:
 
 ```markdown
 ![diagram](assets/architecture.png)
-[whitepaper PDF](assets/foo.pdf)
+[whitepaper](assets/foo.pdf)
 ```
 
-Path resolution:
-
-- **Dev** — Vite middleware serves the local `assets/` directory at `/assets/…`.
-- **Prod** — the renderer rewrites `assets/<path>` to `https://raw.githubusercontent.com/<owner>/<repo>/main/assets/<path>`.
-
-The path you write in the markdown stays as-is in the published file (`assets/foo.png`). The renderer is the only thing that rewrites it.
-
-If your draft references a file that doesn't exist under `assets/`, **publishing fails** with a list of missing paths. Add the file (or fix the path) and re-publish.
-
-### 3. Publish
-
-```bash
-./publish.bash               # Interactive picker
-./publish.bash --all         # Publish everything
-./publish.bash myfile.md     # Publish a specific file
-```
-
-The tool will:
-
-1. Validate that every `assets/*` reference resolves.
-2. Detect mentions of existing wiki page titles → let you opt-in to convert them to `[text](slug)` wiki links.
-3. Search Wikipedia for related terms → let you opt-in to add `W`-marked external links.
-4. Apply the selected links and write `wiki/<slug>.md` with derived tag frontmatter.
-5. Regenerate `wiki/_index.json` and any rotated chunks.
-
-### 4. Deploy
-
-```bash
-cd project
-npm run deploy
-```
-
-This builds, then force-pushes `dist/` to the `gh-pages` branch. The shell CWD never changes — deploy runs in a temp directory.
+Dev: served by Vite middleware. Prod: resolved relative to the deployed site (no GitHub raw fetches). Publishing fails fast if any referenced file is missing.
 
 ## Authors
 
-`authors.json` at the repo root holds a username → metadata map. The minimum is just a `name`; you can also attach a list of `links`:
+`authors.json` is a flat map. `name` is the only required field; `links` is optional.
 
 ```json
 {
@@ -107,92 +77,42 @@ This builds, then force-pushes `dist/` to the `gh-pages` branch. The shell CWD n
     "name": "Abdullah Ahmad",
     "links": [
       { "url": "https://github.com/MAbdullahAhmad" },
-      { "url": "https://linkedin.com/in/m-abdullah-ahmad" }
+      { "url": "https://devabdullah.com" }
     ]
   }
 }
 ```
 
-In a draft's frontmatter, reference authors by username:
+The byline under each page title links to `/#/author/<username>`. Link icons are auto-detected from hostname (GitHub, LinkedIn, X, Instagram, YouTube, Facebook, Upwork) — anything else gets a globe or generic link icon. Schema is open; extend with bios, avatars, etc. as you need them.
 
-```yaml
-author: abdullah
-co-authors:
-  - someone
-  - another
-```
-
-When you run `./publish.bash`, any unknown username triggers an interactive prompt:
+When a draft references an unknown username, `publish.bash` prompts:
 
 ```
-Warning: author 'someone' is not registered.
-Create author 'someone'? [Y/n] y
-Full name for 'someone': Some One
-Created: someone → Some One
+Warning: author 'jane' is not registered.
+Create author 'jane'? [Y/n] y
+Full name for 'jane': Jane Doe
+Created: jane → Jane Doe
 ```
 
-If you decline, the publish for that file is aborted (other files in the batch still process). Author entries can be extended later with bios, avatars, etc. — the rest of the schema is open.
+Decline and that file's publish is aborted; the rest of the batch continues.
 
-The frontend renders a byline under the page title with each author's links as small icons. Common platforms (GitHub, LinkedIn, X/Twitter, Instagram, YouTube, Facebook, Upwork) auto-detect from the URL hostname; anything else gets a globe (website) or generic link icon.
+## How it works
 
-## Page format
+- **Tags.** `Domain → Subject → Topic → Subtopic`, auto-derived from the draft's directory. Color-coded badges throughout the UI.
+- **Index.** [project/scripts/generate-index.js](project/scripts/generate-index.js) builds `wiki/_index.json` containing taxonomy, the authors map, and per-page metadata (excerpt, sections, keywords, word count). Capped at 10 MB per file — overflow spills into `_index-1.json`, `_index-2.json`, … and readers concat them transparently.
+- **Self-contained deploy.** `npm run deploy` ships `dist/` + `wiki/` + `assets/` to `gh-pages`. The site fetches content via relative paths, so it never depends on `main` being merged or the user-pages CDN being warm.
+- **SPA fallback.** [project/public/404.html](project/public/404.html) stashes the requested path in `sessionStorage` and redirects to the base **once** (a sentinel prevents reload loops); [project/index.html](project/index.html) restores it as a hash route.
+- **Performance.** Routes are code-split via `React.lazy`. The home page only fetches the base index; search/browse/tag pages fetch the rotated chunks lazily on first visit. Browse and Search paginate at 60 rows.
 
-```markdown
----
-title: "Machine Learning"
-description: "A subset of AI that enables systems to learn from data"
-tags:
-  - type: subtopic
-    name: Machine Learning
-related:
-  - artificial-intelligence
-  - deep-learning
----
-
-# Machine Learning
-
-Content here, with optional ![image](assets/ml.png).
-```
-
-### Tag types
-
-| Type     | Color  | Description                                                  |
-| -------- | ------ | ------------------------------------------------------------ |
-| domain   | Purple | Top-level category (Technology, Science, Internal, …)        |
-| subject  | Blue   | Subject within a domain (Computer Science, Physics, …)       |
-| topic    | Green  | Specific topic (Artificial Intelligence, Calculus, …)        |
-| subtopic | Amber  | Sub-topic within a topic (Machine Learning, Deep Learning, …) |
-
-## Index rotation
-
-`wiki/_index.json` is the search-and-navigation index. As content grows, the writer ([project/scripts/generate-index.js](project/scripts/generate-index.js)) caps every output file at 10 MB:
-
-- Base file `_index.json` always holds the taxonomy, generation timestamp, a `chunks: N` field, and as many pages as fit.
-- Remaining pages spill into `_index-1.json`, `_index-2.json`, … — each `{ "pages": [...] }` only.
-- Stale chunk files are deleted at the start of every regenerate.
-
-Both readers — the frontend ([project/src/services/wikiService.ts](project/src/services/wikiService.ts)) and the publish tool ([project/scripts/publish-helper.js](project/scripts/publish-helper.js)) — read the base, then fetch and concatenate `chunks` follow-on files. Code that consumes the index sees a single flat `pages[]`.
-
-## Routing & GitHub Pages SPA fallback
-
-The app uses HashRouter, so canonical URLs look like `https://mabdullahahmad.github.io/Wiki/#/page/<slug>`.
-
-If a user lands on a non-existent path under `/Wiki/`, GitHub serves [project/public/404.html](project/public/404.html). It stashes the requested path in `sessionStorage` and redirects to the base path **once** (a session sentinel prevents reload loops). [project/index.html](project/index.html) reads the stash on load and applies it as a hash route. If the stash isn't there or the redirect already fired this session, the 404 simply renders a "Page not found" message instead of looping.
-
-## Development
+## Develop
 
 ```bash
 cd project
 npm install
-npm run generate-index   # Build wiki/_index.json (+ chunks if needed)
-npm run dev              # Start Vite dev server (serves wiki/ and assets/)
-npm run build            # Generate index + tsc + vite build
-npm run deploy           # Full deploy to pages branch
+npm run dev              # Vite dev server (serves wiki/ and assets/)
+npm run generate-index   # Rebuild wiki/_index.json
+npm run build            # generate-index + tsc + vite build
+npm run deploy           # build + push to gh-pages
 ```
 
-## Tech stack
-
-- React 18 + TypeScript + Vite
-- Tailwind CSS + shadcn/ui
-- react-markdown, remark-gfm, rehype-raw, rehype-slug
-- react-router-dom (HashRouter)
+The canonical URL is `/Wiki/` (case-sensitive). The lowercase variant `/wiki/` cannot be served by this repo — it would have to live on `mabdullahahmad.github.io`.

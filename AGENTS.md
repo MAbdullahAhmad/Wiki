@@ -1,42 +1,43 @@
-# Project: Wiki - Personal Knowledge Base
+# AGENTS.md
 
-## Build Commands
+Markdown wiki. Source on `main`, built site on `gh-pages`. Live: https://mabdullahahmad.github.io/Wiki/
+
+## Commands
+
 ```bash
 cd project
-npm install                  # Install dependencies
-npm run generate-index       # Generate wiki/_index.json from markdown files
-npm run dev                  # Start Vite dev server
-npm run build                # Generate index + TypeScript check + Vite build
-npm run deploy               # Full deploy to pages branch
+npm install
+npm run dev              # Vite dev (serves wiki/ + assets/ via middleware)
+npm run generate-index   # Rebuild wiki/_index.json
+npm run build            # generate-index + tsc + vite build
+npm run deploy           # build + force-push dist/+wiki/+assets/ to gh-pages
+npx tsc --noEmit         # Type check only
 ```
 
-## Publishing
 ```bash
-./publish.bash               # Interactive publish from drafts/ to wiki/
-./publish.bash --all         # Publish all drafts at once
-./publish.bash myfile.md     # Publish a specific file by name
+./publish.bash               # interactive
+./publish.bash --all         # all drafts
+./publish.bash <file>.md     # one file
 ```
 
-## Verification
-```bash
-cd project
-npx tsc --noEmit             # Type check
-npx vite build               # Production build
-```
+## Layout
 
-## Key Architecture
-- **Drafts**: `drafts/` organized as `<Domain>/<Subject>/<file>.md` (topics) or `<Domain>/<Subject>/<Topic>/<file>.md` (subtopics)
-- **Published wiki**: `wiki/*.md` flat directory with YAML frontmatter (title, description, tags, related)
-- **Assets**: `assets/` at repo root holds images and binaries; markdown references them as `assets/<path>`. Renderer rewrites to raw GitHub URL in prod; vite middleware serves them in dev. Publish step fails if any reference is missing.
-- **Authors**: `authors.json` at repo root maps `username → { name, links[] }`. Drafts use `author:` (single) and `co-authors:` (list) frontmatter fields. `./publish.bash` interactively prompts to create unknown usernames. Frontend `AuthorByline` resolves usernames to names and renders link icons (auto-detected per hostname).
-- **Publish tool**: `publish.bash` calls `project/scripts/publish-helper.js` for asset validation, link detection, frontmatter management, and tag derivation
-- **Index rotation**: `project/scripts/generate-index.js` writes `wiki/_index.json` (base, with taxonomy + first slice + `chunks: N`) plus `_index-1.json`, `_index-2.json`, … each capped at 10 MB. Both the frontend (`wikiService.ts`) and the publish helper (`loadWikiPages`) merge chunks transparently.
-- **React app**: `project/src/` (Vite + React + TypeScript + Tailwind)
-- **Routing**: HashRouter for GitHub Pages compatibility; `public/404.html` + inline script in `index.html` provide a session-stashed SPA fallback that redirects only once to avoid reload loops.
-- **Data fetching**: Runtime fetch from GitHub raw content URLs (prod) or local files (dev)
-- **Tag hierarchy**: Domain > Subject > Topic > Sub-topic (auto-derived from drafts/ dirs)
+- `drafts/<Domain>/<Subject>/[<Topic>/]<slug>.md` — source. Tags derived from path.
+- `wiki/*.md` — published, flat. `wiki/_index.json` (+ rotated `_index-N.json`) is regenerated each publish.
+- `assets/` — images and binaries; markdown references as `assets/<path>`. Vite serves in dev; prod resolves relative to the deployed site.
+- `authors.json` — `username → { name, links[] }`. Frontmatter uses `author:` + `co-authors:`.
+- `project/` — Vite + React + TS + Tailwind. Routes are code-split via `React.lazy`.
 
-## Adding Wiki Pages
-1. Create markdown file in `drafts/<Domain>/<Subject>/` (topic) or `drafts/<Domain>/<Subject>/<Topic>/` (subtopic)
-2. Run `./publish.bash` to publish with interactive link detection
-3. Tags are auto-derived from directory path; taxonomy auto-updates from drafts/ structure
+## Conventions
+
+- **Self-contained deploy.** `wiki/` and `assets/` are bundled into `gh-pages`. Don't reintroduce raw.githubusercontent.com URLs — the prod site uses relative paths.
+- **Index rotation.** Cap is 10 MB per file. Base file holds taxonomy + authors + first slice + `chunks: N`. Stale chunk files are deleted on each regenerate. Readers in `wikiService.ts` (`fetchWikiIndex` + `ensureFullIndex`) and `publish-helper.js` (`loadWikiPages`) merge transparently.
+- **Lazy index loading.** Home only fetches the base index. Search/Browse/Tag/Author pages call `useWikiIndex({ full: true })` to trigger chunk fetch.
+- **HashRouter + SPA fallback.** `public/404.html` stashes the path in `sessionStorage` and redirects to base once; `index.html` restores it. Don't make the 404 redirect unconditional — it'll loop.
+- **Publish validates.** Asset references and author usernames must resolve before `wiki/<slug>.md` is written.
+
+## Adding a wiki page
+
+1. Create `drafts/<Domain>/<Subject>/[<Topic>/]<slug>.md` with title + optional `author`/`co-authors`.
+2. Run `./publish.bash` (interactive link suggestions; prompts for unknown authors).
+3. `cd project && npm run deploy`.
