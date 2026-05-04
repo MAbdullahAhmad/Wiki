@@ -22,3 +22,8 @@ What does this change and why?
 ## Notes for reviewers
 
 Anything reviewers should know — design tradeoffs, follow-ups, things you're unsure about.
+
+## Linked issues
+
+Closes #
+
