@@ -2,7 +2,7 @@
 
 A markdown wiki served from GitHub Pages. Source on `main`, built site on `gh-pages`.
 
-**Live:** [mabdullahahmad.github.io/Wiki/](https://mabdullahahmad.github.io/Wiki/)
+**Live:** [mabdullahahmad.github.io/Wiki/](https://mabdullahahmad.github.io/Wiki/) · **Docs:** [docs/](docs/README.md)
 
 ## Layout
 
