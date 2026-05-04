@@ -8,6 +8,7 @@ const SearchPage = lazy(() => import('@/components/SearchPage').then((m) => ({ d
 const WikiPageView = lazy(() => import('@/components/WikiPageView').then((m) => ({ default: m.WikiPageView })));
 const TagView = lazy(() => import('@/components/TagView').then((m) => ({ default: m.TagView })));
 const BrowsePage = lazy(() => import('@/components/BrowsePage').then((m) => ({ default: m.BrowsePage })));
+const AuthorPage = lazy(() => import('@/components/AuthorPage').then((m) => ({ default: m.AuthorPage })));
 
 function RouteFallback() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="/browse" element={<BrowsePage />} />
             <Route path="/page/:slug" element={<WikiPageView />} />
             <Route path="/tag/:tagName" element={<TagView />} />
+            <Route path="/author/:username" element={<AuthorPage />} />
           </Routes>
         </Suspense>
       </Layout>
